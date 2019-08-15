@@ -1,0 +1,7 @@
+[package]
+name = "rust-ipfs-log"
+version = "0.1.0"
+authors = ["Frans Saukko <frans@equilibrium.co>"]
+edition = "2018"
+
+[dependencies]
