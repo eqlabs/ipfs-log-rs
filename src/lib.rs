@@ -1,6 +1,9 @@
 mod gset;
+mod lamport_clock;
 
 use gset::GSet;
+use lamport_clock::LamportClock;
+use lamport_clock::IdentityBuilder;
 
 #[cfg(test)]
 mod tests {
@@ -31,5 +34,26 @@ mod tests {
 		w.insert(8);
 		assert!(w.is_subset(&z));
 		assert!(!z.is_subset(&w));
+	}
+
+	#[test]
+	fn test_clock () {
+		let mut ib = IdentityBuilder::new();
+		let mut x = LamportClock::new(ib.build());
+		let y = LamportClock::new(ib.build());
+		let mut z = LamportClock::new(ib.build());
+		assert!(x < y);
+		assert!(y < z);
+		z.tick();
+		x.merge(&z);
+		assert!(x > y);
+		let w = LamportClock::new(ib.build()).time(4);
+		assert!(x < w);
+		for _ in 0..3 {
+			x.tick();
+		}
+		assert!(x < w);
+		x.tick();
+		assert!(x > w);
 	}
 }
