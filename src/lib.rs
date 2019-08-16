@@ -1,3 +1,4 @@
+mod log;
 mod gset;
 mod lamport_clock;
 

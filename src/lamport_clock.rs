@@ -18,6 +18,10 @@ impl LamportClock {
 		self
 	}
 
+	pub fn id (&self) -> &Identity {
+		&self.id
+	}
+
 	pub fn tick (&mut self) {
 		self.time += 1;
 	}
@@ -52,8 +56,12 @@ impl Ord for LamportClock {
 			if delta < 0 {
 				Ordering::Less
 			}
-			else {
+			else if delta > 0 {
 				Ordering::Greater
+			}
+			//is this necessary/hoped for?
+			else {
+				Ordering::Equal
 			}
 		}
 	}
