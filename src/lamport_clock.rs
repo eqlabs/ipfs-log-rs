@@ -27,22 +27,6 @@ impl LamportClock {
 			self.time = o.time;
 		}
 	}
-
-	//is this necessary if there is impl Ord?
-	pub fn compare (a: &LamportClock, b: &LamportClock) -> i64 {
-		let delta = a.time as i64 - b.time as i64;
-		if delta == 0 && a.id != b.id {
-			if a.id < b.id {
-				-1
-			}
-			else {
-				1
-			}
-		}
-		else {
-			delta
-		}
-	}
 }
 
 impl PartialEq for LamportClock {
@@ -68,13 +52,8 @@ impl Ord for LamportClock {
 			if delta < 0 {
 				Ordering::Less
 			}
-			else if delta > 0 {
-				Ordering::Greater
-			}
 			else {
-				//should this panic?
-				panic!("Identical Lamport clocks");
-				//Ordering::Equal
+				Ordering::Greater
 			}
 		}
 	}
