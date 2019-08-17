@@ -7,22 +7,22 @@ pub struct Entry {
 	hash: String,
 }
 
-pub enum SortStrategy<'a> {
+pub enum SortStrategy {
 	LastWriteWins,
 	SortByEntryHash,
-	SortByClocks(Box<&'a dyn Fn(&Entry,&Entry) -> Ordering>),
-	SortByClockIds(Box<&'a dyn Fn(&Entry,&Entry) -> Ordering>),
+	SortByClocks(Box<dyn Fn(&Entry,&Entry) -> Ordering>),
+	SortByClockIds(Box<dyn Fn(&Entry,&Entry) -> Ordering>),
 }
 
-pub struct Log<'a> {
-	sort_strategy: SortStrategy<'a>,
+pub struct Log {
+	sort_strategy: SortStrategy,
 }
 
-impl<'a> Log<'a> {
+impl Log {
 	fn sort (&self, a: &Entry, b: &Entry) -> Ordering {
 		let diff = match self.sort_strategy {
-			SortStrategy::LastWriteWins			=>	self.sort_step_by_step(a,b,&Box::new(&|a,b| Ordering::Less)),
-			SortStrategy::SortByEntryHash		=>	self.sort_step_by_step(a,b,&Box::new(&|a,b| a.hash.cmp(&b.hash))),
+			SortStrategy::LastWriteWins			=>	self.sort_step_by_step(a,b,|_,_| Ordering::Less),
+			SortStrategy::SortByEntryHash		=>	self.sort_step_by_step(a,b,|a,b| a.hash.cmp(&b.hash)),
 			SortStrategy::SortByClocks(ref f)	=>	self.sort_by_clocks(a,b,f),
 			SortStrategy::SortByClockIds(ref f)	=>	self.sort_by_clock_ids(a,b,f),
 		};
@@ -67,13 +67,13 @@ impl<'a> Log<'a> {
 		}*/
 	}
 
-	fn sort_step_by_step (&self, a: &Entry, b: &Entry,
-	resolve: &Box<&dyn Fn(&Entry,&Entry) -> Ordering>) -> Ordering {
-		self.sort_by_clocks(a,b,&Box::new(&|a,b| self.sort_by_clock_ids(a,b,resolve)))
+	fn sort_step_by_step<F: Fn(&Entry,&Entry) -> Ordering> (&self, a: &Entry, b: &Entry,
+	resolve: F) -> Ordering {
+		self.sort_by_clocks(a,b,|a,b| self.sort_by_clock_ids(a,b,&resolve))
 	}
 
-	fn sort_by_clocks (&self, a: &Entry, b: &Entry,
-	resolve: &Box<&dyn Fn(&Entry,&Entry) -> Ordering>) -> Ordering {
+	fn sort_by_clocks<F: Fn(&Entry,&Entry) -> Ordering> (&self, a: &Entry, b: &Entry,
+	resolve: F) -> Ordering {
 		let mut diff = a.clock.cmp(&b.clock);
 		if diff == Ordering::Equal {
 			diff = resolve(a,b);
@@ -81,8 +81,8 @@ impl<'a> Log<'a> {
 		diff
 	}
 
-	fn sort_by_clock_ids (&self, a: &Entry, b: &Entry,
-	resolve: &Box<&dyn Fn(&Entry,&Entry) -> Ordering>) -> Ordering {
+	fn sort_by_clock_ids<F: Fn(&Entry,&Entry) -> Ordering> (&self, a: &Entry, b: &Entry,
+	resolve: F) -> Ordering {
 		let mut diff = a.clock.id().cmp(&b.clock.id());
 		if diff == Ordering::Equal {
 			diff = resolve(a,b);
