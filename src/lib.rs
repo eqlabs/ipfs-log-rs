@@ -7,6 +7,8 @@ mod entry;
 use gset::GSet;
 use lamport_clock::LamportClock;
 use identity::IdentityBuilder;
+use log::Log;
+use entry::Entry;
 
 #[cfg(test)]
 mod tests {

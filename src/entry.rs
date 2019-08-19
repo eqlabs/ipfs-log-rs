@@ -21,6 +21,21 @@ pub struct Entry{
 }
 
 impl Entry {
+	//very ad hoc
+	pub fn empty () -> Entry {
+		let s = "0000".to_owned();
+		Entry {
+			hash: s.clone(),
+			id: s.clone(),
+			payload: Data {
+				data: s.clone(),
+			},
+			next: Vec::new(),
+			v: 0,
+			clock: LamportClock::new(Identity::new(s.clone(),s.clone(),s.clone(),s.clone())),
+		}
+	}
+
 	pub fn new (id: Identity, log_id: &String, data: Data,
 	next: &Vec<EntryOrHash>, clock: Option<LamportClock>) -> Entry {
 		//None filtering required?

@@ -16,7 +16,7 @@ pub struct Identity {
 }
 
 impl Identity {
-	fn new (id: String, public_key: String,
+	pub fn new (id: String, public_key: String,
 	id_signature: String, public_key_id_signature: String) -> Identity {
 		Identity {
 			id: id,
