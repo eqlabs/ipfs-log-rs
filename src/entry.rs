@@ -1,5 +1,5 @@
 use crate::lamport_clock::LamportClock;
-use crate::lamport_clock::Identity;
+use crate::identity::Identity;
 
 //very much ad hoc
 pub struct Data {

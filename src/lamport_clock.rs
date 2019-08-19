@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use crate::identity::Identity;
 
 pub struct LamportClock {
 	id: Identity,
@@ -70,37 +71,5 @@ impl Ord for LamportClock {
 impl PartialOrd for LamportClock {
 	fn partial_cmp (&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
-	}
-}
-
-#[derive(Ord,PartialOrd,Eq,PartialEq)]
-pub struct Identity {
-	id: u64,
-}
-
-impl Identity {
-	fn new (id: u64) -> Identity {
-		Identity {
-			id: id,
-		}
-	}
-}
-
-//very much ad hoc
-pub struct IdentityBuilder {
-	id: u64,
-}
-
-impl IdentityBuilder {
-	pub fn new () -> IdentityBuilder {
-		IdentityBuilder {
-			id: 0,
-		}
-	}
-
-	pub fn build (&mut self) -> Identity {
-		let i = Identity::new(self.id);
-		self.id += 1;
-		i
 	}
 }

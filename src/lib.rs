@@ -1,11 +1,12 @@
 mod log;
 mod gset;
+mod identity;
 mod lamport_clock;
 mod entry;
 
 use gset::GSet;
 use lamport_clock::LamportClock;
-use lamport_clock::IdentityBuilder;
+use identity::IdentityBuilder;
 
 #[cfg(test)]
 mod tests {
