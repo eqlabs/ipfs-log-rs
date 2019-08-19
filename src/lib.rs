@@ -1,6 +1,7 @@
 mod log;
 mod gset;
 mod lamport_clock;
+mod entry;
 
 use gset::GSet;
 use lamport_clock::LamportClock;

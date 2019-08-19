@@ -1,11 +1,5 @@
 use std::cmp::Ordering;
-
-use crate::lamport_clock::LamportClock;
-
-pub struct Entry {
-	clock: LamportClock,
-	hash: String,
-}
+use crate::entry::Entry;
 
 pub enum SortStrategy {
 	LastWriteWins,
@@ -22,7 +16,7 @@ impl Log {
 	fn sort (&self, a: &Entry, b: &Entry) -> Ordering {
 		let diff = match self.sort_strategy {
 			SortStrategy::LastWriteWins			=>	self.sort_step_by_step(a,b,|_,_| Ordering::Less),
-			SortStrategy::SortByEntryHash		=>	self.sort_step_by_step(a,b,|a,b| a.hash.cmp(&b.hash)),
+			SortStrategy::SortByEntryHash		=>	self.sort_step_by_step(a,b,|a,b| a.hash().cmp(&b.hash())),
 			SortStrategy::SortByClocks(ref f)	=>	self.sort_by_clocks(a,b,f),
 			SortStrategy::SortByClockIds(ref f)	=>	self.sort_by_clock_ids(a,b,f),
 		};
@@ -74,7 +68,7 @@ impl Log {
 
 	fn sort_by_clocks<F: Fn(&Entry,&Entry) -> Ordering> (&self, a: &Entry, b: &Entry,
 	resolve: F) -> Ordering {
-		let mut diff = a.clock.cmp(&b.clock);
+		let mut diff = a.clock().cmp(&b.clock());
 		if diff == Ordering::Equal {
 			diff = resolve(a,b);
 		}
@@ -83,7 +77,7 @@ impl Log {
 
 	fn sort_by_clock_ids<F: Fn(&Entry,&Entry) -> Ordering> (&self, a: &Entry, b: &Entry,
 	resolve: F) -> Ordering {
-		let mut diff = a.clock.id().cmp(&b.clock.id());
+		let mut diff = a.clock().id().cmp(&b.clock().id());
 		if diff == Ordering::Equal {
 			diff = resolve(a,b);
 		}
