@@ -7,11 +7,11 @@ pub struct Data {
 }
 
 pub enum EntryOrHash {
-	IsEntry(Entry),
-	IsHash(String),
+	Entry(Entry),
+	Hash(String),
 }
 
-pub struct Entry{
+pub struct Entry {
 	hash: String,
 	id: String,
 	payload: Data,
@@ -40,8 +40,8 @@ impl Entry {
 	next: &Vec<EntryOrHash>, clock: Option<LamportClock>) -> Entry {
 		//None filtering required?
 		let nexts = next.iter().map(|n| match n {
-			EntryOrHash::IsEntry(e)	=>	e.hash.clone(),
-			EntryOrHash::IsHash(s)	=>	s.to_owned(),
+			EntryOrHash::Entry(e)	=>	e.hash.clone(),
+			EntryOrHash::Hash(s)	=>	s.to_owned(),
 		}).collect();
 		Entry {
 			//very much ad hoc
