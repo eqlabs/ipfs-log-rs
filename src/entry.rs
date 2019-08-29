@@ -54,6 +54,10 @@ impl Entry {
 		}
 	}
 
+	pub fn next (&self) -> &Vec<String> {
+		&self.next
+	}
+
 	pub fn clock (&self) -> &LamportClock {
 		&self.clock
 	}
