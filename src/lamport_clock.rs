@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use crate::identity::Identity;
 
+#[derive(Clone)]
 pub struct LamportClock {
 	id: Identity,
 	time: u64,
@@ -14,9 +15,13 @@ impl LamportClock {
 		}
 	}
 
-	pub fn time (mut self, time: u64) -> LamportClock {
+	pub fn set_time (mut self, time: u64) -> LamportClock {
 		self.time = time;
 		self
+	}
+
+	pub fn time (&self) -> u64 {
+		self.time
 	}
 
 	pub fn id (&self) -> &Identity {

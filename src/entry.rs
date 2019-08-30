@@ -40,7 +40,7 @@ impl Entry {
 	next: &Vec<EntryOrHash>, clock: Option<LamportClock>) -> Entry {
 		//None filtering required?
 		let nexts = next.iter().map(|n| match n {
-			EntryOrHash::Entry(e)	=>	e.hash.clone(),
+			EntryOrHash::Entry(e)	=>	e.hash.to_owned(),
 			EntryOrHash::Hash(s)	=>	s.to_owned(),
 		}).collect();
 		Entry {

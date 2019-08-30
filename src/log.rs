@@ -1,10 +1,22 @@
 use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::cmp::max;
 use crate::entry::Entry;
+use crate::entry::Data;
+use crate::entry::EntryOrHash;
+use crate::identity::Identity;
+use crate::lamport_clock::LamportClock;
 
 pub struct Log {
+	id: String,
+	identity: Identity,
+	access: AdHocAccess,
 	entries: HashMap<String,Entry>,
+	length: usize,
+	heads: Vec<String>,
+	nexts: HashMap<String,String>,
 	fn_sort: Box<dyn Fn(&Entry,&Entry) -> Ordering>,
+	clock: LamportClock,
 }
 
 impl Log {
@@ -45,6 +57,57 @@ impl Log {
 		}
 
 		result
+	}
+
+	pub fn append (&mut self, data: Data, n_ptr: Option<usize>) -> &Entry {
+		let mut t_new = self.clock.time();
+		for h in &self.heads {
+			t_new = max(t_new,self.get(&h).unwrap().clock().time());
+		}
+		t_new = t_new + 1;
+		self.clock = LamportClock::new(self.clock.id().clone()).set_time(t_new);
+
+		let mut heads = Vec::new();
+		for h in &self.heads {
+			heads.push(self.get(&h).unwrap());
+		}
+		let refs = self.traverse(heads,Some(max(n_ptr.unwrap_or(1),self.heads.len())),None);
+		let mut keys = Vec::new();
+		for k in refs {
+			keys.push(k.0);
+		}
+		//i)	why reverse?
+		//ii)	does it need to be deduped, like in the original JS version?
+		self.heads.reverse();
+		self.heads.append(&mut keys);
+		let mut hashes = Vec::new();
+		for s in &self.heads {
+			hashes.push(EntryOrHash::Hash(s.to_owned()));
+		}
+
+		//should be created asynchronically in IPFS
+		let entry = Entry::new(self.identity.clone(),&self.id,data,&hashes,Some(self.clock.clone()));
+		//should be queried asynchronically
+		if !self.access.can_access(&entry) {
+			panic!("Could not append entry, key \"{}\" is not allowed to write in the log",
+			self.identity.id());
+		}
+
+		let eh = entry.hash().to_owned();
+		self.entries.insert(eh.to_owned(),entry);
+		for h in hashes {
+			match h {
+				EntryOrHash::Hash(h)	=>	{
+												self.nexts.insert(h.to_owned(),eh.to_owned());
+											},
+				_						=>	unreachable!(),
+			}
+		}
+		self.heads.clear();
+		self.heads.push(eh.to_owned());
+		self.length += 1;
+
+		&self.entries[&eh]
 	}
 
 	pub fn last_write_wins (a: &Entry, b: &Entry) -> Ordering {
@@ -92,5 +155,13 @@ impl Log {
 			}
 			diff
 		})
+	}
+}
+
+struct AdHocAccess;
+
+impl AdHocAccess {
+	fn can_access (&self, entry: &Entry) -> bool {
+		true
 	}
 }

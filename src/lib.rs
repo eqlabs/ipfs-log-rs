@@ -1,13 +1,20 @@
+#![allow(dead_code)]
+
 mod log;
 mod gset;
 mod identity;
 mod lamport_clock;
 mod entry;
 
+#[allow(unused_imports)]
 use gset::GSet;
+#[allow(unused_imports)]
 use lamport_clock::LamportClock;
+#[allow(unused_imports)]
 use identity::IdentityBuilder;
+#[allow(unused_imports)]
 use log::Log;
+#[allow(unused_imports)]
 use entry::Entry;
 
 #[cfg(test)]
@@ -52,7 +59,7 @@ mod tests {
 		z.tick();
 		x.merge(&z);
 		assert!(x > y);
-		let w = LamportClock::new(ib.build()).time(4);
+		let w = LamportClock::new(ib.build()).set_time(4);
 		assert!(x < w);
 		for _ in 0..3 {
 			x.tick();

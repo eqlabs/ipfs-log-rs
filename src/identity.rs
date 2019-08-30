@@ -1,12 +1,12 @@
 use std::cmp::Ordering;
 
-#[derive(Eq,PartialEq)]
+#[derive(Eq,PartialEq,Clone)]
 struct Signatures {
 	id: String,
 	public_key: String,
 }
 
-#[derive(Eq,PartialEq)]
+#[derive(Eq,PartialEq,Clone)]
 pub struct Identity {
 	id: String,
 	public_key: String,
@@ -26,6 +26,10 @@ impl Identity {
 				public_key: public_key_id_signature,
 			},
 		}
+	}
+
+	pub fn id (&self) -> &String {
+		&self.id
 	}
 }
 
