@@ -31,6 +31,10 @@ impl Identity {
 	pub fn id (&self) -> &String {
 		&self.id
 	}
+
+	pub fn public_key (&self) -> &String {
+		&self.public_key
+	}
 }
 
 impl Ord for Identity {

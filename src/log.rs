@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::cmp::Ordering;
 use std::cmp::max;
+use std::time::SystemTime;
 use crate::entry::Entry;
 use crate::entry::Data;
 use crate::entry::EntryOrHash;
@@ -20,6 +21,73 @@ pub struct Log {
 }
 
 impl Log {
+	pub fn new (identity: Identity, id: Option<String>, access: AdHocAccess,
+	entries: Option<Vec<Entry>>, heads: Option<Vec<String>>, clock: Option<LamportClock>,
+	fn_sort: Option<Box<dyn Fn(&Entry,&Entry) -> Ordering>>) -> Log {
+		let fn_sort = Log::no_zeroes(fn_sort.unwrap_or(Box::new(Log::last_write_wins)));
+		let id = id.unwrap_or(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis().to_string());
+		let entries = entries.unwrap_or(Vec::new());
+		let length = entries.len();
+
+		let mut refs = Vec::new();
+		for e in &entries {
+			refs.push(e);
+		}
+		let heads = heads.unwrap_or(Log::find_heads(refs));
+
+		let mut nexts = HashMap::new();
+		for e in &entries {
+			for n in e.next() {
+				nexts.insert(n.to_owned(),e.hash().to_owned());
+			}
+		}
+
+		let mut entry_set = HashMap::new();
+		for e in entries {
+			entry_set.insert(e.hash().to_owned(),e);
+		}
+
+		let mut t_max = 0;
+		if let Some(c) = clock {
+			t_max = c.time();
+		}
+		for h in &heads {
+			t_max = max(t_max,entry_set.get(h).unwrap().clock().time());
+		}
+		//should be identity.public_key
+		let clock = LamportClock::new(identity.clone()).set_time(t_max);
+
+		Log {
+			id: id,
+			identity: identity,
+			access: access,
+			entries: entry_set,
+			length: length,
+			heads: heads,
+			nexts: nexts,
+			fn_sort: fn_sort,
+			clock: clock,
+		}
+	}
+
+	pub fn find_heads (entries: Vec<&Entry>) -> Vec<String> {
+		let mut parents = HashMap::new();
+		for e in &entries {
+			for n in e.next() {
+				parents.insert(n,e.hash());
+			}
+		}
+		let mut heads = Vec::new();
+		for e in entries {
+			if parents.contains_key(e.hash()) {
+				heads.push(e);
+			}
+		}
+		//inequality correct?
+		heads.sort_by(|a,b| b.clock().id().cmp(a.clock().id()));
+		heads.iter().map(|h| h.hash().to_owned()).collect()
+	}
+
 	pub fn get (&self, hash: &String) -> Option<&Entry> {
 		self.entries.get(hash)
 	}
@@ -158,7 +226,7 @@ impl Log {
 	}
 }
 
-struct AdHocAccess;
+pub struct AdHocAccess;
 
 impl AdHocAccess {
 	fn can_access (&self, entry: &Entry) -> bool {
