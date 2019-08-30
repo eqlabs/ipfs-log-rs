@@ -8,7 +8,6 @@ pub struct Log {
 }
 
 impl Log {
-	//very much ad hoc
 	pub fn get (&self, hash: &String) -> Option<&Entry> {
 		self.entries.get(hash)
 	}
