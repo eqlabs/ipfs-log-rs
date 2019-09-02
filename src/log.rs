@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::cmp::Ordering;
 use std::cmp::max;
 use std::time::SystemTime;
@@ -91,12 +92,12 @@ impl Log {
 		self.entries.get(hash)
 	}
 
-	pub fn traverse<'a> (&'a self, roots: Vec<&'a Entry>, amount: Option<usize>, end_hash: Option<String>) -> HashMap<String,&'a Entry> {
+	pub fn traverse<'a> (&'a self, roots: Vec<&'a Entry>, amount: Option<usize>, end_hash: Option<String>) -> Vec<&'a str> {
 		let mut stack = roots;
 		stack.sort_by(|a,b| (self.fn_sort)(a,b));
 		stack.reverse();
-		let mut traversed: HashMap<String,bool> = HashMap::new();
-		let mut result: HashMap<String,&Entry> = HashMap::new();
+		let mut traversed = HashSet::<&str>::new();
+		let mut result = Vec::new();
 		let mut count = 0;
 
 		while !stack.is_empty() && (amount.is_none() || count < amount.unwrap()) {
@@ -105,16 +106,15 @@ impl Log {
 			count += 1;
 			for h in e.next() {
 				if let Some(e) = self.get(h) {
-					if !traversed[e.hash()] {
-						let hash = e.hash().to_owned();
+					if !traversed.contains(e.hash()) {
 						stack.insert(0,e);
 						stack.sort_by(|a,b| (self.fn_sort)(a,b));
 						stack.reverse();
-						traversed.insert(hash,true);
+						traversed.insert(e.hash());
 					}
 				}
 			}
-			result.insert(e.hash().to_owned(),e);
+			result.push(e.hash());
 
 			if let Some(ref eh) = end_hash {
 				if eh == hash {
@@ -140,8 +140,8 @@ impl Log {
 		}
 		let refs = self.traverse(heads,Some(max(n_ptr.unwrap_or(1),self.heads.len())),None);
 		let mut keys = Vec::new();
-		for k in refs {
-			keys.push(k.0);
+		for r in refs {
+			keys.push(r.to_owned());
 		}
 		//i)	why reverse?
 		//ii)	does it need to be deduped, like in the original JS version?
@@ -175,6 +175,44 @@ impl Log {
 		self.length += 1;
 
 		&self.entries[&eh]
+	}
+
+	//unfinished
+	pub fn join (&mut self, other: Log, size: Option<usize>) -> Option<Log> {
+		if self.id != other.id {
+			return None;
+		}
+		let new_hashes = Log::diff(&self,&other);
+
+		//something about identify provider and verification,
+		//implement later
+		//...
+		//...
+
+		Some(other)
+	}
+
+	pub fn diff<'a> (a: &'a Log, b: &'a Log) -> Vec<&'a str> {
+		let mut stack = a.heads.to_owned();
+		let mut traversed = HashSet::<&str>::new();
+		let mut diff = Vec::new();
+		while !stack.is_empty() {
+			let entry_a = a.get(&stack.remove(0));
+			let entry_b = b.get(&stack.remove(0));
+			if entry_a.is_some() && entry_b.is_none()
+			&& entry_a.unwrap().id() == b.id {
+				let entry_a = entry_a.unwrap();
+				diff.push(entry_a.hash());
+				traversed.insert(entry_a.hash());
+				for n in entry_a.next() {
+					if !traversed.contains(&n[..]) && b.get(n).is_none() {
+						stack.push(n.to_string());
+						traversed.insert(n);
+					}
+				}
+			}
+		}
+		diff
 	}
 
 	pub fn last_write_wins (a: &Entry, b: &Entry) -> Ordering {

@@ -50,15 +50,19 @@ impl Entry {
 		}
 	}
 
+	pub fn hash (&self) -> &str {
+		&self.hash
+	}
+
+	pub fn id (&self) -> &str {
+		&self.id
+	}
+
 	pub fn next (&self) -> &Vec<String> {
 		&self.next
 	}
 
 	pub fn clock (&self) -> &LamportClock {
 		&self.clock
-	}
-
-	pub fn hash (&self) -> &str {
-		&self.hash
 	}
 }
