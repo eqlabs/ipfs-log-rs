@@ -50,16 +50,15 @@ mod tests {
 
 	#[test]
 	fn test_clock () {
-		let mut ib = IdentityBuilder::new();
-		let mut x = LamportClock::new(ib.build());
-		let y = LamportClock::new(ib.build());
-		let mut z = LamportClock::new(ib.build());
+		let mut x = LamportClock::new("0000");
+		let y = LamportClock::new("0001");
+		let mut z = LamportClock::new("0002");
 		assert!(x < y);
 		assert!(y < z);
 		z.tick();
 		x.merge(&z);
 		assert!(x > y);
-		let w = LamportClock::new(ib.build()).set_time(4);
+		let w = LamportClock::new("0003").set_time(4);
 		assert!(x < w);
 		for _ in 0..3 {
 			x.tick();

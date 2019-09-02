@@ -55,7 +55,7 @@ impl Log {
 			t_max = max(t_max,entry_set.get(h).unwrap().clock().time());
 		}
 		//should be identity.public_key
-		let clock = LamportClock::new(identity.clone()).set_time(t_max);
+		let clock = LamportClock::new(identity.public_key()).set_time(t_max);
 
 		Log {
 			id: id,
@@ -71,7 +71,7 @@ impl Log {
 	}
 
 	pub fn find_heads (entries: Vec<&Entry>) -> Vec<String> {
-		let mut parents = HashMap::new();
+		let mut parents = HashMap::<&str,&str>::new();
 		for e in &entries {
 			for n in e.next() {
 				parents.insert(n,e.hash());
@@ -88,7 +88,7 @@ impl Log {
 		heads.iter().map(|h| h.hash().to_owned()).collect()
 	}
 
-	pub fn get (&self, hash: &String) -> Option<&Entry> {
+	pub fn get (&self, hash: &str) -> Option<&Entry> {
 		self.entries.get(hash)
 	}
 
@@ -133,7 +133,7 @@ impl Log {
 			t_new = max(t_new,self.get(&h).unwrap().clock().time());
 		}
 		t_new = t_new + 1;
-		self.clock = LamportClock::new(self.clock.id().clone()).set_time(t_new);
+		self.clock = LamportClock::new(self.clock.id()).set_time(t_new);
 
 		let mut heads = Vec::new();
 		for h in &self.heads {
