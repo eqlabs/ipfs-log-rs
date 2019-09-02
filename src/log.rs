@@ -54,7 +54,6 @@ impl Log {
 		for h in &heads {
 			t_max = max(t_max,entry_set.get(h).unwrap().clock().time());
 		}
-		//should be identity.public_key
 		let clock = LamportClock::new(identity.public_key()).set_time(t_max);
 
 		Log {
