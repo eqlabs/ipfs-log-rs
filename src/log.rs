@@ -79,7 +79,7 @@ impl Log {
 		}
 		let mut heads = Vec::new();
 		for e in entries {
-			if parents.contains_key(e.hash()) {
+			if !parents.contains_key(e.hash()) {
 				heads.push(e);
 			}
 		}
