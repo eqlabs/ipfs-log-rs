@@ -23,7 +23,7 @@ pub struct Log {
 
 impl Log {
 	pub fn new (identity: Identity, id: Option<String>, access: AdHocAccess,
-	entries: Option<Vec<Entry>>, heads: Option<Vec<String>>, clock: Option<LamportClock>,
+	entries: Option<Vec<Entry>>, heads: &[String], clock: Option<LamportClock>,
 	fn_sort: Option<Box<dyn Fn(&Entry,&Entry) -> Ordering>>) -> Log {
 		let fn_sort = Log::no_zeroes(fn_sort.unwrap_or(Box::new(Log::last_write_wins)));
 		let id = id.unwrap_or(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis().to_string());
@@ -34,7 +34,13 @@ impl Log {
 		for e in &entries {
 			refs.push(e);
 		}
-		let heads = heads.unwrap_or(Log::find_heads(refs));
+
+		let heads = if heads.is_empty() {
+			Log::find_heads(&refs)
+		}
+		else {
+			heads.to_owned()
+		};
 
 		let mut nexts = HashMap::new();
 		for e in &entries {
@@ -70,9 +76,9 @@ impl Log {
 		}
 	}
 
-	pub fn find_heads (entries: Vec<&Entry>) -> Vec<String> {
+	pub fn find_heads (entries: &[&Entry]) -> Vec<String> {
 		let mut parents = HashMap::<&str,&str>::new();
-		for e in &entries {
+		for e in entries {
 			for n in e.next() {
 				parents.insert(n,e.hash());
 			}
@@ -92,8 +98,8 @@ impl Log {
 		self.entries.get(hash)
 	}
 
-	pub fn traverse<'a> (&'a self, roots: Vec<&'a Entry>, amount: Option<usize>, end_hash: Option<String>) -> Vec<&'a str> {
-		let mut stack = roots;
+	pub fn traverse<'a> (&'a self, roots: &[&'a Entry], amount: Option<usize>, end_hash: Option<String>) -> Vec<&'a str> {
+		let mut stack = roots.to_owned();
 		stack.sort_by(|a,b| (self.fn_sort)(a,b));
 		stack.reverse();
 		let mut traversed = HashSet::<&str>::new();
@@ -102,7 +108,7 @@ impl Log {
 
 		while !stack.is_empty() && (amount.is_none() || count < amount.unwrap()) {
 			let e = stack.remove(0);
-			let hash = &e.hash().to_owned();
+			let hash = e.hash();
 			count += 1;
 			for h in e.next() {
 				if let Some(e) = self.get(h) {
@@ -138,7 +144,7 @@ impl Log {
 		for h in &self.heads {
 			heads.push(self.get(&h).unwrap());
 		}
-		let refs = self.traverse(heads,Some(max(n_ptr.unwrap_or(1),self.heads.len())),None);
+		let refs = self.traverse(&heads,Some(max(n_ptr.unwrap_or(1),self.heads.len())),None);
 		let mut keys = Vec::new();
 		for r in refs {
 			keys.push(r.to_owned());
