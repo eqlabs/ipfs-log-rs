@@ -10,12 +10,12 @@ mod entry;
 use gset::GSet;
 #[allow(unused_imports)]
 use lamport_clock::LamportClock;
-#[allow(unused_imports)]
-use identity::IdentityBuilder;
-#[allow(unused_imports)]
+use identity::Identity;
 use log::Log;
+use log::AdHocAccess;
 #[allow(unused_imports)]
 use entry::Entry;
+use entry::EntryOrHash;
 
 #[cfg(test)]
 mod tests {
@@ -66,5 +66,36 @@ mod tests {
 		assert!(x < w);
 		x.tick();
 		assert!(x > w);
+	}
+
+	#[test]
+	fn log_join () {
+		let id = Identity::new("0","1","2","3");
+		let acc = AdHocAccess;
+		let mut x = Log::new(id.clone(),None,acc,None,&[],None,None);
+		x.append("to".to_owned(),None);
+		x.append("set".to_owned(),None);
+		x.append("your".to_owned(),None);
+		x.append("global".to_owned(),None);
+
+		let log_id = "xyz";
+		let e2 = Entry::new(id.clone(),log_id,"second".to_owned(),&[],None);
+		let e3 = Entry::new(id.clone(),log_id,"third".to_owned(),&[],None);
+		let e1 = Entry::new(id.clone(),log_id,"first".to_owned(),&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e3)],None);
+		let es = vec!(e1,e2,e3);
+		let mut y = Log::new(id.clone(),None,acc,Some(es),&[],None,None);
+
+		let log_id = "xyz";
+		let e2 = Entry::new(id.clone(),log_id,"second".to_owned(),&[],None);
+		let e4 = Entry::new(id.clone(),log_id,"fourth".to_owned(),&[],None);
+		let e1 = Entry::new(id.clone(),log_id,"first".to_owned(),&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e4)],None);
+		let es = vec!(e1,e2,e4);
+		let mut z = Log::new(id.clone(),None,acc,Some(es),&[],None,None);
+
+		println!("[entries,heads,nexts]\nx: {:?}\ny: {:?}\nz: {:?}",x.all(),y.all(),z.all());
+
+		println!("diff {:?}",Log::diff(&y,&z));
+		println!("diff {:?}",Log::diff(&z,&y));
+		assert!(false);
 	}
 }

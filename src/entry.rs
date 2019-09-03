@@ -4,8 +4,8 @@ use crate::identity::Identity;
 //very much ad hoc
 pub type Data = String;
 
-pub enum EntryOrHash {
-	Entry(Entry),
+pub enum EntryOrHash<'a> {
+	Entry(&'a Entry),
 	Hash(String),
 }
 
@@ -41,7 +41,7 @@ impl Entry {
 		}).collect();
 		Entry {
 			//very much ad hoc
-			hash: "12345678".to_owned(),
+			hash: data.to_owned(),
 			id: log_id.to_owned(),
 			payload: data,
 			next: next,

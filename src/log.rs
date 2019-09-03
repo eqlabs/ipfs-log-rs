@@ -98,6 +98,10 @@ impl Log {
 		self.entries.get(hash)
 	}
 
+	pub fn all (&self) -> (Vec<String>,&Vec<String>,&HashMap<String,String>) {
+		(self.entries.iter().map(|e| e.0.to_owned()).collect(),&self.heads,&self.nexts)
+	}
+
 	pub fn traverse<'a> (&'a self, roots: &[&'a Entry], amount: Option<usize>, end_hash: Option<String>) -> Vec<&'a str> {
 		let mut stack = roots.to_owned();
 		stack.sort_by(|a,b| (self.fn_sort)(a,b));
@@ -203,8 +207,9 @@ impl Log {
 		let mut traversed = HashSet::<&str>::new();
 		let mut diff = Vec::new();
 		while !stack.is_empty() {
-			let entry_a = a.get(&stack.remove(0));
-			let entry_b = b.get(&stack.remove(0));
+			let hash = stack.remove(0);
+			let entry_a = a.get(&hash);
+			let entry_b = b.get(&hash);
 			if entry_a.is_some() && entry_b.is_none()
 			&& entry_a.unwrap().id() == b.id {
 				let entry_a = entry_a.unwrap();
@@ -212,7 +217,7 @@ impl Log {
 				traversed.insert(entry_a.hash());
 				for n in entry_a.next() {
 					if !traversed.contains(&n[..]) && b.get(n).is_none() {
-						stack.push(n.to_string());
+						stack.push(n.to_owned());
 						traversed.insert(n);
 					}
 				}
@@ -269,6 +274,7 @@ impl Log {
 	}
 }
 
+#[derive(Copy,Clone)]
 pub struct AdHocAccess;
 
 impl AdHocAccess {
