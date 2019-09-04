@@ -4,7 +4,6 @@ use std::cmp::Ordering;
 use std::cmp::max;
 use std::time::SystemTime;
 use crate::entry::Entry;
-use crate::entry::Data;
 use crate::entry::EntryOrHash;
 use crate::identity::Identity;
 use crate::lamport_clock::LamportClock;
@@ -136,7 +135,7 @@ impl Log {
 		result
 	}
 
-	pub fn append (&mut self, data: Data, n_ptr: Option<usize>) -> &Entry {
+	pub fn append (&mut self, data: &str, n_ptr: Option<usize>) -> &Entry {
 		let mut t_new = self.clock.time();
 		for h in &self.heads {
 			t_new = max(t_new,self.get(&h).unwrap().clock().time());
@@ -192,7 +191,7 @@ impl Log {
 		if self.id != other.id {
 			return None;
 		}
-		let new_hashes = Log::diff(&self,&other);
+		let new_hashes = self.diff(&other);
 
 		//something about identify provider and verification,
 		//implement later
@@ -202,21 +201,21 @@ impl Log {
 		Some(other)
 	}
 
-	pub fn diff<'a> (a: &'a Log, b: &'a Log) -> Vec<&'a str> {
-		let mut stack = a.heads.to_owned();
+	pub fn diff (&self, other: &Log) -> Vec<&str> {
+		let mut stack = self.heads.to_owned();
 		let mut traversed = HashSet::<&str>::new();
 		let mut diff = Vec::new();
 		while !stack.is_empty() {
 			let hash = stack.remove(0);
-			let entry_a = a.get(&hash);
-			let entry_b = b.get(&hash);
-			if entry_a.is_some() && entry_b.is_none()
-			&& entry_a.unwrap().id() == b.id {
-				let entry_a = entry_a.unwrap();
-				diff.push(entry_a.hash());
-				traversed.insert(entry_a.hash());
-				for n in entry_a.next() {
-					if !traversed.contains(&n[..]) && b.get(n).is_none() {
+			let a = self.get(&hash);
+			let b = other.get(&hash);
+			if a.is_some() && b.is_none()
+			&& a.unwrap().id() == other.id {
+				let a = a.unwrap();
+				diff.push(a.hash());
+				traversed.insert(a.hash());
+				for n in a.next() {
+					if !traversed.contains(&n[..]) && other.get(n).is_none() {
 						stack.push(n.to_owned());
 						traversed.insert(n);
 					}

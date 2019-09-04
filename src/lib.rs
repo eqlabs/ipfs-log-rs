@@ -10,11 +10,15 @@ mod entry;
 use gset::GSet;
 #[allow(unused_imports)]
 use lamport_clock::LamportClock;
+#[allow(unused_imports)]
 use identity::Identity;
+#[allow(unused_imports)]
 use log::Log;
+#[allow(unused_imports)]
 use log::AdHocAccess;
 #[allow(unused_imports)]
 use entry::Entry;
+#[allow(unused_imports)]
 use entry::EntryOrHash;
 
 #[cfg(test)]
@@ -73,29 +77,30 @@ mod tests {
 		let id = Identity::new("0","1","2","3");
 		let acc = AdHocAccess;
 		let mut x = Log::new(id.clone(),None,acc,None,&[],None,None);
-		x.append("to".to_owned(),None);
-		x.append("set".to_owned(),None);
-		x.append("your".to_owned(),None);
-		x.append("global".to_owned(),None);
+		x.append("to",None);
+		x.append("set",None);
+		x.append("your",None);
+		x.append("global",None);
 
 		let log_id = "xyz";
-		let e2 = Entry::new(id.clone(),log_id,"second".to_owned(),&[],None);
-		let e3 = Entry::new(id.clone(),log_id,"third".to_owned(),&[],None);
-		let e1 = Entry::new(id.clone(),log_id,"first".to_owned(),&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e3)],None);
+		let e2 = Entry::new(id.clone(),log_id,"second",&[],None);
+		let e3 = Entry::new(id.clone(),log_id,"third",&[],None);
+		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e3)],None);
 		let es = vec!(e1,e2,e3);
 		let mut y = Log::new(id.clone(),None,acc,Some(es),&[],None,None);
+		y.append("fifth",None);
 
 		let log_id = "xyz";
-		let e2 = Entry::new(id.clone(),log_id,"second".to_owned(),&[],None);
-		let e4 = Entry::new(id.clone(),log_id,"fourth".to_owned(),&[],None);
-		let e1 = Entry::new(id.clone(),log_id,"first".to_owned(),&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e4)],None);
+		let e2 = Entry::new(id.clone(),log_id,"second",&[],None);
+		let e4 = Entry::new(id.clone(),log_id,"fourth",&[],None);
+		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e4)],None);
 		let es = vec!(e1,e2,e4);
 		let mut z = Log::new(id.clone(),None,acc,Some(es),&[],None,None);
+		z.append("sixth",None);
 
 		println!("[entries,heads,nexts]\nx: {:?}\ny: {:?}\nz: {:?}",x.all(),y.all(),z.all());
 
-		println!("diff {:?}",Log::diff(&y,&z));
-		println!("diff {:?}",Log::diff(&z,&y));
-		assert!(false);
+		println!("diff {:?}",y.diff(&z));
+		println!("diff {:?}",z.diff(&y));
 	}
 }

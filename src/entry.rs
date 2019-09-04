@@ -1,9 +1,6 @@
 use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
 
-//very much ad hoc
-pub type Data = String;
-
 pub enum EntryOrHash<'a> {
 	Entry(&'a Entry),
 	Hash(String),
@@ -12,7 +9,7 @@ pub enum EntryOrHash<'a> {
 pub struct Entry {
 	hash: String,
 	id: String,
-	payload: Data,
+	payload: String,
 	next: Vec<String>,
 	v: u32,
 	clock: LamportClock,
@@ -32,7 +29,7 @@ impl Entry {
 		}
 	}
 
-	pub fn new (identity: Identity, log_id: &str, data: Data,
+	pub fn new (identity: Identity, log_id: &str, data: &str,
 	next: &[EntryOrHash], clock: Option<LamportClock>) -> Entry {
 		//None filtering required?
 		let next = next.iter().map(|n| match n {
@@ -43,7 +40,7 @@ impl Entry {
 			//very much ad hoc
 			hash: data.to_owned(),
 			id: log_id.to_owned(),
-			payload: data,
+			payload: data.to_owned(),
 			next: next,
 			v: 1,
 			clock: clock.unwrap_or(LamportClock::new(identity.public_key())),
