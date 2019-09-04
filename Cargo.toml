@@ -6,4 +6,5 @@ edition = "2018"
 
 [dependencies]
 serde = "1.0"
+hyper = "0.12"
 ipfs-api = "0.5.1"

@@ -6,6 +6,10 @@ mod identity;
 mod lamport_clock;
 mod entry;
 
+use std::io::Cursor;
+use ipfs_api::IpfsClient;
+use hyper::rt::Future;
+
 #[allow(unused_imports)]
 use gset::GSet;
 #[allow(unused_imports)]
@@ -104,5 +108,13 @@ mod tests {
 		println!("diff z-y\t{:?}",z.diff(&y));
 		y.join(z,None);
 		println!("join y+z\t{:?}",y.all());
+	}
+
+	#[test]
+	fn ipfs () {
+		let client = IpfsClient::default();
+		let data = Cursor::new("Hello, world!");
+		let request = client.add(data).map(|r| println!("{}",r.hash)).map_err(|e| eprintln!("{}",e));
+		hyper::rt::run(request);
 	}
 }
