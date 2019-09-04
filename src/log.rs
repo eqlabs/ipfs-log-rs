@@ -186,19 +186,51 @@ impl Log {
 		&self.entries[&eh]
 	}
 
-	//unfinished
-	pub fn join (&mut self, other: Log, size: Option<usize>) -> Option<Log> {
+	pub fn join (&mut self, other: Log, size: Option<usize>) -> bool {
 		if self.id != other.id {
-			return None;
+			return false;
 		}
-		let new_hashes = self.diff(&other);
+		let new_hashes = other.diff(&self);
 
 		//something about identify provider and verification,
 		//implement later
 		//...
 		//...
 
-		Some(other)
+		for h in &new_hashes {
+			if let None = self.get(*h) {
+				self.length += 1;
+			}
+			let e = other.get(*h).unwrap();
+			for n in e.next() {
+				self.nexts.insert(other.get(n).unwrap().hash().to_owned(),(*h).to_owned());
+			}
+		}
+
+		for h in &new_hashes {
+			self.entries.insert((*h).to_owned(),other.get(*h).unwrap().clone());
+		}
+
+		let mut nexts_from_new_items = HashSet::new();
+		for h in &new_hashes {
+			other.get(h).unwrap().next().iter().for_each(|n| {
+				nexts_from_new_items.insert(n);
+			});
+		}
+		let all_heads = Log::find_heads(&self.heads.iter().map(|h| self.get(h).unwrap()).
+		chain(other.heads.iter().map(|h| other.get(h).unwrap())).collect::<Vec<&Entry>>()[..]);
+		let merged_heads: Vec<String> = all_heads.into_iter().filter(|h| !nexts_from_new_items.contains(h)).
+		filter(|h| !self.nexts.contains_key(h)).collect();
+		self.heads = merged_heads;
+
+		//slice to new size?
+
+		let mut t_max = 0;
+		for h in &self.heads {
+			t_max = max(t_max,self.get(h).unwrap().clock().time());
+		}
+		self.clock = LamportClock::new(&self.id).set_time(t_max);
+		true
 	}
 
 	pub fn diff (&self, other: &Log) -> Vec<&str> {

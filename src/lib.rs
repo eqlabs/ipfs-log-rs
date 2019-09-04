@@ -92,15 +92,17 @@ mod tests {
 
 		let log_id = "xyz";
 		let e2 = Entry::new(id.clone(),log_id,"second",&[],None);
-		let e4 = Entry::new(id.clone(),log_id,"fourth",&[],None);
-		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e4)],None);
+		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2)],None);
+		let e4 = Entry::new(id.clone(),log_id,"fourth",&[EntryOrHash::Entry(&e1)],None);
 		let es = vec!(e1,e2,e4);
 		let mut z = Log::new(id.clone(),None,acc,Some(es),&[],None,None);
 		z.append("sixth",None);
 
-		println!("[entries,heads,nexts]\nx: {:?}\ny: {:?}\nz: {:?}",x.all(),y.all(),z.all());
+		println!("\t\t[entries,heads,nexts]\nx:\t\t{:?}\ny:\t\t{:?}\nz:\t\t{:?}",x.all(),y.all(),z.all());
 
-		println!("diff {:?}",y.diff(&z));
-		println!("diff {:?}",z.diff(&y));
+		println!("diff y-z\t{:?}",y.diff(&z));
+		println!("diff z-y\t{:?}",z.diff(&y));
+		y.join(z,None);
+		println!("join y+z\t{:?}",y.all());
 	}
 }
