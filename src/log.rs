@@ -111,6 +111,17 @@ impl Log {
 		(self.entries.iter().map(|e| e.0.to_owned()).collect(),&self.heads,&self.nexts)
 	}
 
+	pub fn entries (&self) -> String {
+		let mut s = String::new();
+		for e in &self.entries {
+			s = format!("{}{}\n",s,e.0);
+			for n in e.1.next() {
+				s = format!("{}{}{}\n",s,">\t",n);
+			}
+		}
+		s
+	}
+
 	pub fn traverse<'a> (&'a self, roots: &[&'a Entry], amount: Option<usize>, end_hash: Option<String>) -> Vec<&'a str> {
 		let mut stack = roots.to_owned();
 		stack.sort_by(|a,b| (self.fn_sort)(a,b));
@@ -241,6 +252,7 @@ impl Log {
 			t_max = max(t_max,self.get(h).unwrap_or_else(|| other.get(h).unwrap()).clock().time());
 		}
 		self.clock = LamportClock::new(&self.id).set_time(t_max);
+
 		true
 	}
 

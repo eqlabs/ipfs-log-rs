@@ -111,13 +111,16 @@ mod tests {
 		println!("diff y-z\t{:?}",y.diff(&z));
 		y.join(&z,None);
 		println!("join y+z = y\t{:?}",y.all());
+		println!("----\ty\t----\n{}",y.entries());
 		//println!("diff z-y\t{:?}",z.diff(&y));
 		//z.join(&y,None);
 		//println!("join z+y = z\t{:?}",z.all());
+		//println!("----\tz\t----\n{}",z.entries());
 
 		println!("diff x-y\t{:?}",x.diff(&y));
 		x.join(&y,None);
 		println!("join x+y = x\t{:?}",x.all());
+		println!("----\tx\t----\n{}",x.entries());
 	}
 
 	#[test]
