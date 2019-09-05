@@ -21,11 +21,16 @@ pub struct Log {
 }
 
 impl Log {
-	pub fn new (identity: Identity, id: Option<String>, access: AdHocAccess,
+	pub fn new (identity: Identity, id: Option<&str>, access: AdHocAccess,
 	entries: Option<Vec<Entry>>, heads: &[String], clock: Option<LamportClock>,
 	fn_sort: Option<Box<dyn Fn(&Entry,&Entry) -> Ordering>>) -> Log {
 		let fn_sort = Log::no_zeroes(fn_sort.unwrap_or(Box::new(Log::last_write_wins)));
-		let id = id.unwrap_or(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis().to_string());
+		let id = if let Some(s) = id {
+			s.to_owned()
+		}
+		else {
+			SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis().to_string()
+		};
 		let entries = entries.unwrap_or(Vec::new());
 		let length = entries.len();
 
@@ -34,12 +39,12 @@ impl Log {
 			refs.push(e);
 		}
 
-		let heads = if heads.is_empty() {
+		let heads = Log::dedup(&if heads.is_empty() {
 			Log::find_heads(&refs)
 		}
 		else {
 			heads.to_owned()
-		};
+		});
 
 		let mut nexts = HashMap::new();
 		for e in &entries {
@@ -91,6 +96,11 @@ impl Log {
 		//inequality correct?
 		heads.sort_by(|a,b| b.clock().id().cmp(a.clock().id()));
 		heads.iter().map(|h| h.hash().to_owned()).collect()
+	}
+
+	fn dedup (v: &[String]) -> Vec<String> {
+		let mut s = HashSet::new();
+		v.into_iter().filter(|x| s.insert((x).to_owned())).map(|x| (*x).to_owned()).collect()
 	}
 
 	pub fn get (&self, hash: &str) -> Option<&Entry> {
@@ -155,6 +165,7 @@ impl Log {
 		//i)	why reverse?
 		//ii)	does it need to be deduped, like in the original JS version?
 		self.heads.reverse();
+		self.heads = Log::dedup(&self.heads);
 		self.heads.append(&mut keys);
 		let mut hashes = Vec::new();
 		for s in &self.heads {
@@ -186,7 +197,7 @@ impl Log {
 		&self.entries[&eh]
 	}
 
-	pub fn join (&mut self, other: Log, size: Option<usize>) -> bool {
+	pub fn join (&mut self, other: &Log, size: Option<usize>) -> bool {
 		if self.id != other.id {
 			return false;
 		}
@@ -221,13 +232,13 @@ impl Log {
 		chain(other.heads.iter().map(|h| other.get(h).unwrap())).collect::<Vec<&Entry>>()[..]);
 		let merged_heads: Vec<String> = all_heads.into_iter().filter(|h| !nexts_from_new_items.contains(h)).
 		filter(|h| !self.nexts.contains_key(h)).collect();
-		self.heads = merged_heads;
+		self.heads = Log::dedup(&merged_heads);
 
 		//slice to new size?
 
 		let mut t_max = 0;
 		for h in &self.heads {
-			t_max = max(t_max,self.get(h).unwrap().clock().time());
+			t_max = max(t_max,self.get(h).unwrap_or_else(|| other.get(h).unwrap()).clock().time());
 		}
 		self.clock = LamportClock::new(&self.id).set_time(t_max);
 		true
@@ -309,7 +320,7 @@ impl Log {
 pub struct AdHocAccess;
 
 impl AdHocAccess {
-	fn can_access (&self, entry: &Entry) -> bool {
+	fn can_access (&self, _entry: &Entry) -> bool {
 		true
 	}
 }

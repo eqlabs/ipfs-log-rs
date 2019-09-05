@@ -6,8 +6,11 @@ mod identity;
 mod lamport_clock;
 mod entry;
 
+#[allow(unused_imports)]
 use std::io::Cursor;
+#[allow(unused_imports)]
 use ipfs_api::IpfsClient;
+#[allow(unused_imports)]
 use hyper::rt::Future;
 
 #[allow(unused_imports)]
@@ -79,42 +82,49 @@ mod tests {
 	#[test]
 	fn log_join () {
 		let id = Identity::new("0","1","2","3");
+		let log_id = "xyz";
 		let acc = AdHocAccess;
-		let mut x = Log::new(id.clone(),None,acc,None,&[],None,None);
+		let mut x = Log::new(id.clone(),Some(log_id),acc,None,&[],None,None);
 		x.append("to",None);
 		x.append("set",None);
 		x.append("your",None);
 		x.append("global",None);
 
-		let log_id = "xyz";
 		let e2 = Entry::new(id.clone(),log_id,"second",&[],None);
 		let e3 = Entry::new(id.clone(),log_id,"third",&[],None);
 		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e3)],None);
 		let es = vec!(e1,e2,e3);
-		let mut y = Log::new(id.clone(),None,acc,Some(es),&[],None,None);
+		let mut y = Log::new(id.clone(),Some(log_id),acc,Some(es),&[],None,None);
 		y.append("fifth",None);
+		y.append("seventh",None);
 
-		let log_id = "xyz";
 		let e2 = Entry::new(id.clone(),log_id,"second",&[],None);
 		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2)],None);
-		let e4 = Entry::new(id.clone(),log_id,"fourth",&[EntryOrHash::Entry(&e1)],None);
-		let es = vec!(e1,e2,e4);
-		let mut z = Log::new(id.clone(),None,acc,Some(es),&[],None,None);
+		let es = vec!(e1,e2);
+		let mut z = Log::new(id.clone(),Some(log_id),acc,Some(es),&[],None,None);
+		z.append("fourth",None);
 		z.append("sixth",None);
+		z.append("eighth",None);
 
-		println!("\t\t[entries,heads,nexts]\nx:\t\t{:?}\ny:\t\t{:?}\nz:\t\t{:?}",x.all(),y.all(),z.all());
+		println!("\t\t([entries,heads,nexts])\nx:\t\t{:?}\ny:\t\t{:?}\nz:\t\t{:?}",x.all(),y.all(),z.all());
 
 		println!("diff y-z\t{:?}",y.diff(&z));
-		println!("diff z-y\t{:?}",z.diff(&y));
-		y.join(z,None);
-		println!("join y+z\t{:?}",y.all());
+		y.join(&z,None);
+		println!("join y+z = y\t{:?}",y.all());
+		//println!("diff z-y\t{:?}",z.diff(&y));
+		//z.join(&y,None);
+		//println!("join z+y = z\t{:?}",z.all());
+
+		println!("diff x-y\t{:?}",x.diff(&y));
+		x.join(&y,None);
+		println!("join x+y = x\t{:?}",x.all());
 	}
 
 	#[test]
 	fn ipfs () {
 		let client = IpfsClient::default();
-		let data = Cursor::new("Hello, world!");
-		let request = client.add(data).map(|r| println!("{}",r.hash)).map_err(|e| eprintln!("{}",e));
+		let data = Cursor::new("tinamämmi");
+		let request = client.add(data).map(|r| println!("ipfs/{}",r.hash)).map_err(|e| eprintln!("{}",e));
 		hyper::rt::run(request);
 	}
 }
