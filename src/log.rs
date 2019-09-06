@@ -15,7 +15,7 @@ pub struct Log {
 	entries: HashMap<String,Entry>,
 	length: usize,
 	heads: Vec<String>,
-	nexts: HashMap<String,String>,
+	nexts: HashSet<String>,
 	fn_sort: Box<dyn Fn(&Entry,&Entry) -> Ordering>,
 	clock: LamportClock,
 }
@@ -46,10 +46,10 @@ impl Log {
 			heads.to_owned()
 		});
 
-		let mut nexts = HashMap::new();
+		let mut nexts = HashSet::new();
 		for e in &entries {
 			for n in e.next() {
-				nexts.insert(n.to_owned(),e.hash().to_owned());
+				nexts.insert(n.to_owned());
 			}
 		}
 
@@ -107,17 +107,34 @@ impl Log {
 		self.entries.get(hash)
 	}
 
-	pub fn all (&self) -> (Vec<String>,&Vec<String>,&HashMap<String,String>) {
-		(self.entries.iter().map(|e| e.0.to_owned()).collect(),&self.heads,&self.nexts)
+	pub fn all (&self) -> String {
+		let mut s = String::from("[ ");
+		for e in &self.entries {
+			if self.heads.contains(e.0) {
+				s.push_str("^");
+			}
+			s.push_str(e.0);
+			s.push_str(", ");
+		}
+		s = String::from(&s[..s.len() - 2]);
+		s.push_str(" ]");
+		s
 	}
 
 	pub fn entries (&self) -> String {
 		let mut s = String::new();
 		for e in &self.entries {
-			s = format!("{}{}\n",s,e.0);
-			for n in e.1.next() {
-				s = format!("{}{}{}\n",s,">\t",n);
+			s.push_str(e.0);
+			if !e.1.next().is_empty() {
+				s.push_str("\t\t>");
+				s.push_str(&e.1.next()[0]);
+				s.push_str(", >");
+				s.push_str(&e.1.next()[1]);
 			}
+			else {
+				s.push_str("\t\t.,.");
+			}
+			s.push_str("\n");
 		}
 		s
 	}
@@ -194,7 +211,7 @@ impl Log {
 		for h in hashes {
 			match h {
 				EntryOrHash::Hash(h)	=>	{
-												self.nexts.insert(h.to_owned(),eh.to_owned());
+												self.nexts.insert(h.to_owned());
 											},
 				_						=>	unreachable!(),
 			}
@@ -223,7 +240,7 @@ impl Log {
 			}
 			let e = other.get(*h).unwrap();
 			for n in e.next() {
-				self.nexts.insert(other.get(n).unwrap().hash().to_owned(),(*h).to_owned());
+				self.nexts.insert(other.get(n).unwrap().hash().to_owned());
 			}
 		}
 
@@ -240,7 +257,7 @@ impl Log {
 		let all_heads = Log::find_heads(&self.heads.iter().map(|h| self.get(h).unwrap()).
 		chain(other.heads.iter().map(|h| other.get(h).unwrap())).collect::<Vec<&Entry>>()[..]);
 		let merged_heads: Vec<String> = all_heads.into_iter().filter(|h| !nexts_from_new_items.contains(h)).
-		filter(|h| !self.nexts.contains_key(h)).collect();
+		filter(|h| !self.nexts.contains(h)).collect();
 		self.heads = Log::dedup(&merged_heads);
 
 		//slice to new size?

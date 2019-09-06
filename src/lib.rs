@@ -106,21 +106,21 @@ mod tests {
 		z.append("sixth",None);
 		z.append("eighth",None);
 
-		println!("\t\t([entries,heads,nexts])\nx:\t\t{:?}\ny:\t\t{:?}\nz:\t\t{:?}",x.all(),y.all(),z.all());
+		println!("x:\t\t{}\ny:\t\t{}\nz:\t\t{}",x.all(),y.all(),z.all());
 
 		println!("diff y-z\t{:?}",y.diff(&z));
 		y.join(&z,None);
-		println!("join y+z = y\t{:?}",y.all());
-		println!("----\ty\t----\n{}",y.entries());
+		println!("join y+z = y\t{}\n",y.all());
+		println!("----\t\ty\t\t----\n{}",y.entries());
 		//println!("diff z-y\t{:?}",z.diff(&y));
 		//z.join(&y,None);
-		//println!("join z+y = z\t{:?}",z.all());
-		//println!("----\tz\t----\n{}",z.entries());
+		//println!("join z+y = z\t{}",z.all());
+		//println!("----\t\tz\t\t----\n{}",z.entries());
 
 		println!("diff x-y\t{:?}",x.diff(&y));
 		x.join(&y,None);
-		println!("join x+y = x\t{:?}",x.all());
-		println!("----\tx\t----\n{}",x.entries());
+		println!("join x+y = x\t{}\n",x.all());
+		println!("----\t\tx\t\t----\n{}",x.entries());
 	}
 
 	#[test]
