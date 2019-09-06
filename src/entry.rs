@@ -1,3 +1,4 @@
+use serde::Serialize;
 use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
 
@@ -6,7 +7,7 @@ pub enum EntryOrHash<'a> {
 	Hash(String),
 }
 
-#[derive(Clone)]
+#[derive(Clone,Serialize)]
 pub struct Entry {
 	hash: String,
 	id: String,

@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::cmp::Ordering;
 use std::cmp::max;
 use std::time::SystemTime;
+use serde_json::json;
 use crate::entry::Entry;
 use crate::entry::EntryOrHash;
 use crate::identity::Identity;
@@ -103,8 +104,18 @@ impl Log {
 		v.into_iter().filter(|x| s.insert((x).to_owned())).map(|x| (*x).to_owned()).collect()
 	}
 
+	pub fn has (&self, hash: &str) -> bool {
+		self.entries.contains_key(hash)
+	}
+
 	pub fn get (&self, hash: &str) -> Option<&Entry> {
 		self.entries.get(hash)
+	}
+
+	pub fn values (&self) -> Vec<&Entry> {
+		let mut es = self.traverse(&self.heads.iter().map(|x| self.get(x).unwrap()).collect::<Vec<_>>()[..],None,None);
+		es.reverse();
+		es.iter().map(|x| self.get(x).unwrap()).collect()
 	}
 
 	pub fn all (&self) -> String {
@@ -293,6 +304,24 @@ impl Log {
 			}
 		}
 		diff
+	}
+
+	pub fn json (&self) -> String {
+		let mut hs = self.heads.to_owned();
+		hs.sort_by(|a,b| (self.fn_sort)(self.get(a).unwrap(),self.get(b).unwrap()));
+		hs.reverse();
+		json!({
+			"id": self.id,
+			"heads": hs,
+		}).to_string()
+	}
+
+	pub fn snapshot (&self) -> String {
+		json!({
+			"id": self.id,
+			"heads": self.heads,
+			"values": self.values(),
+		}).to_string()
 	}
 
 	pub fn last_write_wins (a: &Entry, b: &Entry) -> Ordering {

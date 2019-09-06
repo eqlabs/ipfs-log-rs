@@ -117,6 +117,9 @@ mod tests {
 		//println!("join z+y = z\t{}",z.all());
 		//println!("----\t\tz\t\t----\n{}",z.entries());
 
+		println!("{}",y.json());
+		println!("{}",y.snapshot());
+
 		println!("diff x-y\t{:?}",x.diff(&y));
 		x.join(&y,None);
 		println!("join x+y = x\t{}\n",x.all());
