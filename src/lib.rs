@@ -108,21 +108,26 @@ mod tests {
 
 		println!("x:\t\t{}\ny:\t\t{}\nz:\t\t{}",x.all(),y.all(),z.all());
 
-		println!("diff y-z\t{:?}",y.diff(&z));
+		println!("diff z-y\t{:?}",z.diff(&y));
 		y.join(&z,None);
-		println!("join y+z = y\t{}\n",y.all());
+		println!("join z+y = y\t{}\n",y.all());
 		println!("----\t\ty\t\t----\n{}",y.entries());
-		//println!("diff z-y\t{:?}",z.diff(&y));
+		//println!("diff y-z\t{:?}",y.diff(&z));
 		//z.join(&y,None);
-		//println!("join z+y = z\t{}",z.all());
+		//println!("join y+z = z\t{}",z.all());
 		//println!("----\t\tz\t\t----\n{}",z.entries());
 
-		println!("{}",y.json());
-		println!("{}",y.snapshot());
+		println!("diff z-y\t{:?}",z.diff(&y));
+		y.join(&z,None);
+		println!("join z+y = y\t{}\n",y.all());
+		println!("----\t\ty\t\t----\n{}",y.entries());
 
-		println!("diff x-y\t{:?}",x.diff(&y));
+		println!("y (json)\t{}",y.json());
+		println!("y (snapshot)\t{}\n",y.snapshot());
+
+		println!("diff y-x\t{:?}",y.diff(&x));
 		x.join(&y,None);
-		println!("join x+y = x\t{}\n",x.all());
+		println!("join y+x = x\t{}\n",x.all());
 		println!("----\t\tx\t\t----\n{}",x.entries());
 	}
 

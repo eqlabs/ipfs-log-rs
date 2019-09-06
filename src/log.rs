@@ -150,7 +150,7 @@ impl Log {
 		s
 	}
 
-	pub fn traverse<'a> (&'a self, roots: &[&'a Entry], amount: Option<usize>, end_hash: Option<String>) -> Vec<&'a str> {
+	pub fn traverse<'a> (&'a self, roots: &[&'a Entry], amount: Option<usize>, end_hash: Option<String>) -> Vec<String> {
 		let mut stack = roots.to_owned();
 		stack.sort_by(|a,b| (self.fn_sort)(a,b));
 		stack.reverse();
@@ -172,7 +172,7 @@ impl Log {
 					}
 				}
 			}
-			result.push(e.hash());
+			result.push(e.hash().to_owned());
 
 			if let Some(ref eh) = end_hash {
 				if eh == hash {
@@ -271,7 +271,20 @@ impl Log {
 		filter(|h| !self.nexts.contains(h)).collect();
 		self.heads = Log::dedup(&merged_heads);
 
-		//slice to new size?
+		//incorrect, reimplement this
+		if let Some(n) = size {
+			let mut vs = self.traverse(&self.heads.iter().map(|x| self.get(x).unwrap()).collect::<Vec<_>>()[..],None,None);
+			vs.reverse();
+			let mut s = HashSet::new();
+			vs = vs.into_iter().filter(|x| s.insert(x.to_owned())).take(n).collect();
+			self.heads = Log::find_heads(&vs.iter().map(|x| self.get(x).unwrap()).collect::<Vec<_>>()[..]);
+			let es = HashMap::new();
+			vs.into_iter().for_each(|x| {
+				self.entries.insert(x.to_owned(),self.get(&x).unwrap().clone());
+			});
+			self.entries = es;
+			self.length = self.entries.len();
+		}
 
 		let mut t_max = 0;
 		for h in &self.heads {
