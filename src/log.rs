@@ -173,8 +173,6 @@ impl Log {
 		for r in refs {
 			keys.push(r.to_owned());
 		}
-		//i)	why reverse?
-		//ii)	does it need to be deduped, like in the original JS version?
 		self.heads.reverse();
 		self.heads = Log::dedup(&self.heads);
 		self.heads.append(&mut keys);
