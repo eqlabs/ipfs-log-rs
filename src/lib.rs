@@ -7,6 +7,9 @@ mod lamport_clock;
 mod entry;
 
 #[allow(unused_imports)]
+use std::rc::Rc;
+
+#[allow(unused_imports)]
 use std::io::Cursor;
 #[allow(unused_imports)]
 use ipfs_api::IpfsClient;
@@ -84,7 +87,7 @@ mod tests {
 		let id = Identity::new("0","1","2","3");
 		let log_id = "xyz";
 		let acc = AdHocAccess;
-		let mut x = Log::new(id.clone(),Some(log_id),acc,None,&[],None,None);
+		let mut x = Log::new(id.clone(),Some(log_id),acc,&[],&[],None,None);
 		x.append("to",None);
 		x.append("set",None);
 		x.append("your",None);
@@ -93,15 +96,12 @@ mod tests {
 		let e2 = Entry::new(id.clone(),log_id,"second",&[],None);
 		let e3 = Entry::new(id.clone(),log_id,"third",&[],None);
 		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e3)],None);
-		let es = vec!(e1,e2,e3);
-		let mut y = Log::new(id.clone(),Some(log_id),acc,Some(es),&[],None,None);
+		let es = &[Rc::new(e1),Rc::new(e2),Rc::new(e3)];
+		let mut y = Log::new(id.clone(),Some(log_id),acc,es,&[],None,None);
 		y.append("fifth",None);
 		y.append("seventh",None);
 
-		let e2 = Entry::new(id.clone(),log_id,"second",&[],None);
-		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2)],None);
-		let es = vec!(e1,e2);
-		let mut z = Log::new(id.clone(),Some(log_id),acc,Some(es),&[],None,None);
+		let mut z = Log::new(id.clone(),Some(log_id),acc,es,&[],None,None);
 		z.append("fourth",None);
 		z.append("sixth",None);
 		z.append("eighth",None);
@@ -122,8 +122,8 @@ mod tests {
 		println!("join z+y = y\t{}\n",y.all());
 		println!("----\t\ty\t\t----\n{}",y.entries());
 
-		println!("y (json)\t{}",y.json());
-		println!("y (snapshot)\t{}\n",y.snapshot());
+		//println!("y (json)\t{}",y.json());
+		//println!("y (snapshot)\t{}\n",y.snapshot());
 
 		println!("diff y-x\t{:?}",y.diff(&x));
 		x.join(&y,None);

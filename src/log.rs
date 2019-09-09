@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::cmp::Ordering;
 use std::cmp::max;
 use std::time::SystemTime;
+use std::rc::Rc;
 use serde_json::json;
 use crate::entry::Entry;
 use crate::entry::EntryOrHash;
@@ -13,9 +14,9 @@ pub struct Log {
 	id: String,
 	identity: Identity,
 	access: AdHocAccess,
-	entries: HashMap<String,Entry>,
+	entries: HashMap<String,Rc<Entry>>,
 	length: usize,
-	heads: Vec<String>,
+	heads: Vec<Rc<Entry>>,
 	nexts: HashSet<String>,
 	fn_sort: Box<dyn Fn(&Entry,&Entry) -> Ordering>,
 	clock: LamportClock,
@@ -23,7 +24,7 @@ pub struct Log {
 
 impl Log {
 	pub fn new (identity: Identity, id: Option<&str>, access: AdHocAccess,
-	entries: Option<Vec<Entry>>, heads: &[String], clock: Option<LamportClock>,
+	entries: &[Rc<Entry>], heads: &[Rc<Entry>], clock: Option<LamportClock>,
 	fn_sort: Option<Box<dyn Fn(&Entry,&Entry) -> Ordering>>) -> Log {
 		let fn_sort = Log::no_zeroes(fn_sort.unwrap_or(Box::new(Log::last_write_wins)));
 		let id = if let Some(s) = id {
@@ -32,23 +33,17 @@ impl Log {
 		else {
 			SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis().to_string()
 		};
-		let entries = entries.unwrap_or(Vec::new());
 		let length = entries.len();
 
-		let mut refs = Vec::new();
-		for e in &entries {
-			refs.push(e);
-		}
-
 		let heads = Log::dedup(&if heads.is_empty() {
-			Log::find_heads(&refs)
+			Log::find_heads(&entries)
 		}
 		else {
 			heads.to_owned()
 		});
 
 		let mut nexts = HashSet::new();
-		for e in &entries {
+		for e in entries {
 			for n in e.next() {
 				nexts.insert(n.to_owned());
 			}
@@ -56,7 +51,7 @@ impl Log {
 
 		let mut entry_set = HashMap::new();
 		for e in entries {
-			entry_set.insert(e.hash().to_owned(),e);
+			entry_set.insert(e.hash().to_owned(),e.clone());
 		}
 
 		let mut t_max = 0;
@@ -64,7 +59,7 @@ impl Log {
 			t_max = c.time();
 		}
 		for h in &heads {
-			t_max = max(t_max,entry_set.get(h).unwrap().clock().time());
+			t_max = max(t_max,h.clock().time());
 		}
 		let clock = LamportClock::new(identity.public_key()).set_time(t_max);
 
@@ -81,7 +76,7 @@ impl Log {
 		}
 	}
 
-	pub fn find_heads (entries: &[&Entry]) -> Vec<String> {
+	pub fn find_heads (entries: &[Rc<Entry>]) -> Vec<Rc<Entry>> {
 		let mut parents = HashMap::<&str,&str>::new();
 		for e in entries {
 			for n in e.next() {
@@ -91,37 +86,38 @@ impl Log {
 		let mut heads = Vec::new();
 		for e in entries {
 			if !parents.contains_key(e.hash()) {
-				heads.push(e);
+				heads.push(e.clone());
 			}
 		}
 		//inequality correct?
 		heads.sort_by(|a,b| b.clock().id().cmp(a.clock().id()));
-		heads.iter().map(|h| h.hash().to_owned()).collect()
+		heads
 	}
 
-	fn dedup (v: &[String]) -> Vec<String> {
+	fn dedup (v: &[Rc<Entry>]) -> Vec<Rc<Entry>> {
 		let mut s = HashSet::new();
-		v.into_iter().filter(|x| s.insert((x).to_owned())).map(|x| (*x).to_owned()).collect()
+		v.iter().filter(|x| s.insert(x.hash())).map(|x| x.clone()).collect()
 	}
 
 	pub fn has (&self, hash: &str) -> bool {
 		self.entries.contains_key(hash)
 	}
 
-	pub fn get (&self, hash: &str) -> Option<&Entry> {
+	pub fn get (&self, hash: &str) -> Option<&Rc<Entry>> {
 		self.entries.get(hash)
 	}
 
-	pub fn values (&self) -> Vec<&Entry> {
-		let mut es = self.traverse(&self.heads.iter().map(|x| self.get(x).unwrap()).collect::<Vec<_>>()[..],None,None);
+	pub fn values (&self) -> Vec<Rc<Entry>> {
+		let mut es = self.traverse(&self.heads,None,None);
 		es.reverse();
-		es.iter().map(|x| self.get(x).unwrap()).collect()
+		es
 	}
 
 	pub fn all (&self) -> String {
 		let mut s = String::from("[ ");
 		for e in &self.entries {
-			if self.heads.contains(e.0) {
+			//ad hoc
+			if false { //self.heads.contains(e.1) {
 				s.push_str("^");
 			}
 			s.push_str(e.0);
@@ -150,7 +146,7 @@ impl Log {
 		s
 	}
 
-	pub fn traverse<'a> (&'a self, roots: &[&'a Entry], amount: Option<usize>, end_hash: Option<String>) -> Vec<String> {
+	pub fn traverse<'a> (&'a self, roots: &[Rc<Entry>], amount: Option<usize>, end_hash: Option<String>) -> Vec<Rc<Entry>> {
 		let mut stack = roots.to_owned();
 		stack.sort_by(|a,b| (self.fn_sort)(a,b));
 		stack.reverse();
@@ -160,22 +156,22 @@ impl Log {
 
 		while !stack.is_empty() && (amount.is_none() || count < amount.unwrap()) {
 			let e = stack.remove(0);
-			let hash = e.hash();
+			let hash = e.hash().to_owned();
 			count += 1;
 			for h in e.next() {
 				if let Some(e) = self.get(h) {
 					if !traversed.contains(e.hash()) {
-						stack.insert(0,e);
+						stack.insert(0,e.clone());
 						stack.sort_by(|a,b| (self.fn_sort)(a,b));
 						stack.reverse();
 						traversed.insert(e.hash());
 					}
 				}
 			}
-			result.push(e.hash().to_owned());
+			result.push(e);
 
 			if let Some(ref eh) = end_hash {
-				if eh == hash {
+				if eh == &hash {
 					break;
 				}
 			}
@@ -187,30 +183,24 @@ impl Log {
 	pub fn append (&mut self, data: &str, n_ptr: Option<usize>) -> &Entry {
 		let mut t_new = self.clock.time();
 		for h in &self.heads {
-			t_new = max(t_new,self.get(&h).unwrap().clock().time());
+			t_new = max(t_new,h.clock().time());
 		}
 		t_new = t_new + 1;
 		self.clock = LamportClock::new(self.clock.id()).set_time(t_new);
 
 		let mut heads = Vec::new();
 		for h in &self.heads {
-			heads.push(self.get(&h).unwrap());
+			heads.push(h.clone());
 		}
-		let refs = self.traverse(&heads,Some(max(n_ptr.unwrap_or(1),self.heads.len())),None);
-		let mut keys = Vec::new();
-		for r in refs {
-			keys.push(r.to_owned());
-		}
+		let mut refs = self.traverse(&heads[..],Some(max(n_ptr.unwrap_or(1),self.heads.len())),None);
 		self.heads.reverse();
 		self.heads = Log::dedup(&self.heads);
-		self.heads.append(&mut keys);
-		let mut hashes = Vec::new();
-		for s in &self.heads {
-			hashes.push(EntryOrHash::Hash(s.to_owned()));
-		}
+		self.heads.append(&mut refs);
 
 		//should be created asynchronically in IPFS
-		let entry = Entry::new(self.identity.clone(),&self.id,data,&hashes,Some(self.clock.clone()));
+		let entry = Entry::new(self.identity.clone(),&self.id,data,
+		&self.heads.iter().map(|x| EntryOrHash::Hash(x.hash().to_owned())).collect::<Vec<_>>()[..],
+		Some(self.clock.clone()));
 		//should be queried asynchronically
 		if !self.access.can_access(&entry) {
 			panic!("Could not append entry, key \"{}\" is not allowed to write in the log",
@@ -218,17 +208,13 @@ impl Log {
 		}
 
 		let eh = entry.hash().to_owned();
-		self.entries.insert(eh.to_owned(),entry);
-		for h in hashes {
-			match h {
-				EntryOrHash::Hash(h)	=>	{
-												self.nexts.insert(h.to_owned());
-											},
-				_						=>	unreachable!(),
-			}
+		let rc = Rc::new(entry);
+		self.entries.insert(eh.to_owned(),rc.clone());
+		for h in &self.heads {
+			self.nexts.insert(h.hash().to_owned());
 		}
 		self.heads.clear();
-		self.heads.push(eh.to_owned());
+		self.heads.push(rc);
 		self.length += 1;
 
 		&self.entries[&eh]
@@ -265,13 +251,13 @@ impl Log {
 				nexts_from_new_items.insert(n);
 			});
 		}
-		let all_heads = Log::find_heads(&self.heads.iter().map(|h| self.get(h).unwrap()).
-		chain(other.heads.iter().map(|h| other.get(h).unwrap())).collect::<Vec<&Entry>>()[..]);
-		let merged_heads: Vec<String> = all_heads.into_iter().filter(|h| !nexts_from_new_items.contains(h)).
-		filter(|h| !self.nexts.contains(h)).collect();
-		self.heads = Log::dedup(&merged_heads);
+		let all_heads = Log::find_heads(&self.heads.iter().chain(other.heads.iter()).map(|x| x.clone()).collect::<Vec<_>>()[..]);
+		let merged_heads: Vec<Rc<Entry>> = all_heads.into_iter().filter(|x| !nexts_from_new_items.contains(&x.hash().to_owned())).
+		filter(|x| !self.nexts.contains(&x.hash().to_owned())).collect();
+		self.heads = Log::dedup(&merged_heads[..]);
 
 		//incorrect, reimplement this
+		/*
 		if let Some(n) = size {
 			let mut vs = self.traverse(&self.heads.iter().map(|x| self.get(x).unwrap()).collect::<Vec<_>>()[..],None,None);
 			vs.reverse();
@@ -284,11 +270,11 @@ impl Log {
 			});
 			self.entries = es;
 			self.length = self.entries.len();
-		}
+		}*/
 
 		let mut t_max = 0;
 		for h in &self.heads {
-			t_max = max(t_max,self.get(h).unwrap_or_else(|| other.get(h).unwrap()).clock().time());
+			t_max = max(t_max,h.clock().time());
 		}
 		self.clock = LamportClock::new(&self.id).set_time(t_max);
 
@@ -296,7 +282,7 @@ impl Log {
 	}
 
 	pub fn diff (&self, other: &Log) -> Vec<&str> {
-		let mut stack = self.heads.to_owned();
+		let mut stack: Vec<String> = self.heads.iter().map(|x| x.hash().to_owned()).collect();
 		let mut traversed = HashSet::<&str>::new();
 		let mut diff = Vec::new();
 		while !stack.is_empty() {
@@ -319,9 +305,10 @@ impl Log {
 		diff
 	}
 
+	/*
 	pub fn json (&self) -> String {
 		let mut hs = self.heads.to_owned();
-		hs.sort_by(|a,b| (self.fn_sort)(self.get(a).unwrap(),self.get(b).unwrap()));
+		hs.sort_by(|a,b| (self.fn_sort)(a,b));
 		hs.reverse();
 		json!({
 			"id": self.id,
@@ -335,7 +322,7 @@ impl Log {
 			"heads": self.heads,
 			"values": self.values(),
 		}).to_string()
-	}
+	}*/
 
 	pub fn last_write_wins (a: &Entry, b: &Entry) -> Ordering {
 		Log::sort_step_by_step(|_,_| Ordering::Less)(a,b)
