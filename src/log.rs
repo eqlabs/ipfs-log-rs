@@ -116,8 +116,7 @@ impl Log {
 	pub fn all (&self) -> String {
 		let mut s = String::from("[ ");
 		for e in &self.entries {
-			//ad hoc
-			if false { //self.heads.contains(e.1) {
+			if self.heads.iter().any(|x| x.hash() == e.1.hash()) {
 				s.push_str("^");
 			}
 			s.push_str(e.0);
@@ -305,24 +304,25 @@ impl Log {
 		diff
 	}
 
-	/*
 	pub fn json (&self) -> String {
 		let mut hs = self.heads.to_owned();
 		hs.sort_by(|a,b| (self.fn_sort)(a,b));
 		hs.reverse();
 		json!({
 			"id": self.id,
-			"heads": hs,
+			"heads": hs.into_iter().map(|x| x.hash().to_owned()).collect::<Vec<_>>(),
 		}).to_string()
 	}
 
 	pub fn snapshot (&self) -> String {
+		let hs = self.heads.to_owned();
+		let vs = self.values().to_owned();
 		json!({
 			"id": self.id,
-			"heads": self.heads,
-			"values": self.values(),
+			"heads": hs.into_iter().map(|x| serde_json::to_string(&*x).unwrap()).collect::<Vec<_>>(),
+			"values": vs.into_iter().map(|x| serde_json::to_string(&*x).unwrap()).collect::<Vec<_>>(),
 		}).to_string()
-	}*/
+	}
 
 	pub fn last_write_wins (a: &Entry, b: &Entry) -> Ordering {
 		Log::sort_step_by_step(|_,_| Ordering::Less)(a,b)
