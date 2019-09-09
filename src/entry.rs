@@ -7,7 +7,7 @@ pub enum EntryOrHash<'a> {
 	Hash(String),
 }
 
-#[derive(Clone,Serialize)]
+#[derive(Clone,Debug,Serialize)]
 pub struct Entry {
 	hash: String,
 	id: String,

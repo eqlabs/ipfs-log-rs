@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::cmp::Ordering;
 
-#[derive(Clone,Serialize)]
+#[derive(Clone,Debug,Serialize)]
 pub struct LamportClock {
 	id: String,
 	time: u64,

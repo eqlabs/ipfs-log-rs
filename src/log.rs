@@ -223,53 +223,48 @@ impl Log {
 		if self.id != other.id {
 			return false;
 		}
-		let new_hashes = other.diff(&self);
+		let new_items = other.diff(&self);
 
 		//something about identify provider and verification,
 		//implement later
 		//...
 		//...
 
-		for h in &new_hashes {
-			if let None = self.get(*h) {
+		for e in &new_items {
+			if let None = self.get(e.0) {
 				self.length += 1;
 			}
-			let e = other.get(*h).unwrap();
-			for n in e.next() {
-				self.nexts.insert(other.get(n).unwrap().hash().to_owned());
+			for n in e.1.next() {
+				self.nexts.insert(n.to_owned());
 			}
 		}
 
-		for h in &new_hashes {
-			self.entries.insert((*h).to_owned(),other.get(*h).unwrap().clone());
+		for e in &new_items {
+			self.entries.insert(e.0.to_owned(),e.1.clone());
 		}
 
 		let mut nexts_from_new_items = HashSet::new();
-		for h in &new_hashes {
-			other.get(h).unwrap().next().iter().for_each(|n| {
-				nexts_from_new_items.insert(n);
-			});
-		}
+		new_items.into_iter().map(|x| x.1.next().to_owned()).for_each(|n| n.iter().for_each(|n| {
+			nexts_from_new_items.insert(n.to_owned());
+		}));
 		let all_heads = Log::find_heads(&self.heads.iter().chain(other.heads.iter()).map(|x| x.clone()).collect::<Vec<_>>()[..]);
 		let merged_heads: Vec<Rc<Entry>> = all_heads.into_iter().filter(|x| !nexts_from_new_items.contains(&x.hash().to_owned())).
 		filter(|x| !self.nexts.contains(&x.hash().to_owned())).collect();
 		self.heads = Log::dedup(&merged_heads[..]);
 
-		//incorrect, reimplement this
-		/*
 		if let Some(n) = size {
-			let mut vs = self.traverse(&self.heads.iter().map(|x| self.get(x).unwrap()).collect::<Vec<_>>()[..],None,None);
+			let mut vs = self.values();
 			vs.reverse();
-			let mut s = HashSet::new();
-			vs = vs.into_iter().filter(|x| s.insert(x.to_owned())).take(n).collect();
-			self.heads = Log::find_heads(&vs.iter().map(|x| self.get(x).unwrap()).collect::<Vec<_>>()[..]);
-			let es = HashMap::new();
-			vs.into_iter().for_each(|x| {
-				self.entries.insert(x.to_owned(),self.get(&x).unwrap().clone());
-			});
-			self.entries = es;
+			vs = vs.into_iter().take(n).collect();
+
+			self.entries.clear();
+			for v in &vs {
+				self.entries.insert(v.hash().to_owned(),v.clone());
+			}
+
+			self.heads = Log::dedup(&vs);
 			self.length = self.entries.len();
-		}*/
+		}
 
 		let mut t_max = 0;
 		for h in &self.heads {
@@ -280,10 +275,10 @@ impl Log {
 		true
 	}
 
-	pub fn diff (&self, other: &Log) -> Vec<&str> {
+	pub fn diff (&self, other: &Log) -> HashMap<String,Rc<Entry>> {
 		let mut stack: Vec<String> = self.heads.iter().map(|x| x.hash().to_owned()).collect();
 		let mut traversed = HashSet::<&str>::new();
-		let mut diff = Vec::new();
+		let mut diff = HashMap::new();
 		while !stack.is_empty() {
 			let hash = stack.remove(0);
 			let a = self.get(&hash);
@@ -291,14 +286,14 @@ impl Log {
 			if a.is_some() && b.is_none()
 			&& a.unwrap().id() == other.id {
 				let a = a.unwrap();
-				diff.push(a.hash());
-				traversed.insert(a.hash());
 				for n in a.next() {
 					if !traversed.contains(&n[..]) && other.get(n).is_none() {
 						stack.push(n.to_owned());
 						traversed.insert(n);
 					}
 				}
+				traversed.insert(a.hash());
+				diff.insert(a.hash().to_owned(),a.clone());
 			}
 		}
 		diff

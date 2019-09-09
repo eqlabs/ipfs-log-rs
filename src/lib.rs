@@ -108,16 +108,16 @@ mod tests {
 
 		println!("x:\t\t{}\ny:\t\t{}\nz:\t\t{}",x.all(),y.all(),z.all());
 
-		println!("diff z-y\t{:?}",z.diff(&y));
-		y.join(&z,None);
+		println!("diff z-y\t{:?}",z.diff(&y).iter().map(|x| x.1.hash().to_owned()).collect::<Vec<_>>());
+		y.join(&z,Some(4));
 		println!("join z+y = y\t{}\n",y.all());
 		println!("----\t\ty\t\t----\n{}",y.entries());
-		//println!("diff y-z\t{:?}",y.diff(&z));
+		//println!("diff y-z\t{:?}",y.diff(&z).iter().map(|x| x.1.hash().to_owned()).collect::<Vec<_>>());
 		//z.join(&y,None);
 		//println!("join y+z = z\t{}",z.all());
 		//println!("----\t\tz\t\t----\n{}",z.entries());
 
-		println!("diff z-y\t{:?}",z.diff(&y));
+		println!("diff z-y\t{:?}",z.diff(&y).iter().map(|x| x.1.hash().to_owned()).collect::<Vec<_>>());
 		y.join(&z,None);
 		println!("join z+y = y\t{}\n",y.all());
 		println!("----\t\ty\t\t----\n{}",y.entries());
@@ -125,8 +125,8 @@ mod tests {
 		println!("y (json)\t{}",y.json());
 		println!("y (snapshot)\t{}\n",y.snapshot());
 
-		println!("diff y-x\t{:?}",y.diff(&x));
-		x.join(&y,None);
+		println!("diff y-x\t{:?}",y.diff(&x).iter().map(|x| x.1.hash().to_owned()).collect::<Vec<_>>());
+		x.join(&y,Some(6));
 		println!("join y+x = x\t{}\n",x.all());
 		println!("----\t\tx\t\t----\n{}",x.entries());
 	}
