@@ -262,7 +262,7 @@ impl Log {
 				self.entries.insert(v.hash().to_owned(),v.clone());
 			}
 
-			self.heads = Log::dedup(&vs);
+			self.heads = Log::find_heads(&Log::dedup(&vs));
 			self.length = self.entries.len();
 		}
 
