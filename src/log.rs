@@ -94,13 +94,65 @@ impl Log {
 		heads
 	}
 
+	pub fn find_tails (entries: &[Rc<Entry>]) -> Vec<Rc<Entry>> {
+		let mut no_nexts = Vec::new();
+		let mut reverses = HashMap::new();
+		let mut nexts = HashSet::new();
+		let mut hashes: HashSet<&str> = HashSet::new();
+		for e in entries {
+			if e.next().is_empty() {
+				no_nexts.push(e.clone());
+			}
+			for n in e.next() {
+				reverses.insert(n,e.clone());
+				nexts.insert(n);
+			}
+			hashes.insert(e.hash());
+		}
+		//correct order?
+		let mut tails = Log::dedup(&nexts.iter().filter(|&&x| !hashes.contains(&x[..])).
+		map(|x| reverses[x].clone()).chain(no_nexts.into_iter()).collect::<Vec<_>>()[..]);
+		tails.sort();
+		tails
+	}
+
+	pub fn find_tail_hashes (entries: &[Rc<Entry>]) -> Vec<String> {
+		let mut hashes: HashSet<&str> = HashSet::new();
+		for e in entries {
+			hashes.insert(e.hash());
+		}
+		let mut ths = Vec::new();
+		for e in entries {
+			for i in e.next().len() - 1..0 {
+				let n = &e.next()[i];
+				if !hashes.contains(&n[..]) {
+					ths.push(n.to_owned());
+				}
+			}
+		}
+		ths.reverse();
+		ths
+	}
+
 	fn dedup (v: &[Rc<Entry>]) -> Vec<Rc<Entry>> {
 		let mut s = HashSet::new();
 		v.iter().filter(|x| s.insert(x.hash())).map(|x| x.clone()).collect()
 	}
 
+	pub fn id (&self) -> &str {
+		&self.id
+	}
+
+	pub fn clock (&self) -> &LamportClock {
+		&self.clock
+	}
+
 	pub fn has (&self, hash: &str) -> bool {
 		self.entries.contains_key(hash)
+	}
+
+	pub fn len (&self) -> usize {
+		self.length
 	}
 
 	pub fn get (&self, hash: &str) -> Option<&Rc<Entry>> {
@@ -111,6 +163,21 @@ impl Log {
 		let mut es = self.traverse(&self.heads,None,None);
 		es.reverse();
 		es
+	}
+
+	pub fn heads (&self) -> Vec<Rc<Entry>> {
+		let mut hs = self.heads.to_owned();
+		hs.sort_by(|a,b| (self.fn_sort)(a,b));
+		hs.reverse();
+		hs
+	}
+
+	pub fn tails (&self) -> Vec<Rc<Entry>> {
+		Log::find_tails(&self.values())
+	}
+
+	pub fn tail_hashes (&self) -> Vec<String> {
+		Log::find_tail_hashes(&self.values())
 	}
 
 	pub fn all (&self) -> String {
@@ -317,6 +384,10 @@ impl Log {
 			"heads": hs.into_iter().map(|x| serde_json::to_string(&*x).unwrap()).collect::<Vec<_>>(),
 			"values": vs.into_iter().map(|x| serde_json::to_string(&*x).unwrap()).collect::<Vec<_>>(),
 		}).to_string()
+	}
+
+	pub fn buffer (&self) -> Vec<u8> {
+		self.json().into_bytes()
 	}
 
 	pub fn last_write_wins (a: &Entry, b: &Entry) -> Ordering {

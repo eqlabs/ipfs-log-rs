@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use serde::Serialize;
 use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
@@ -63,5 +64,31 @@ impl Entry {
 
 	pub fn clock (&self) -> &LamportClock {
 		&self.clock
+	}
+}
+
+impl PartialEq for Entry {
+	fn eq (&self, other: &Self) -> bool {
+		self.hash == other.hash
+	}
+}
+
+impl Eq for Entry {}
+
+impl Ord for Entry {
+	fn cmp (&self, other: &Self) -> Ordering {
+		let diff = self.clock().cmp(other.clock());
+		if diff == Ordering::Equal {
+			self.clock().id().cmp(other.clock().id())
+		}
+		else {
+			diff
+		}
+	}
+}
+
+impl PartialOrd for Entry {
+	fn partial_cmp (&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
 	}
 }
