@@ -212,7 +212,7 @@ impl Log {
 		s
 	}
 
-	pub fn traverse<'a> (&'a self, roots: &[Rc<Entry>], amount: Option<usize>, end_hash: Option<String>) -> Vec<Rc<Entry>> {
+	pub fn traverse (&self, roots: &[Rc<Entry>], amount: Option<usize>, end_hash: Option<String>) -> Vec<Rc<Entry>> {
 		let mut stack = roots.to_owned();
 		stack.sort_by(|a,b| (self.fn_sort)(a,b));
 		stack.reverse();
