@@ -51,6 +51,11 @@ impl Entry {
 		}
 	}
 
+	pub fn create (identity: Identity, log_id: &str, data: &str,
+	next: &[EntryOrHash], clock: Option<LamportClock>) -> Rc<Entry> {
+		Rc::new(Entry::new(identity,log_id,data,next,clock))
+	}
+
 	pub fn hash (&self) -> &str {
 		&self.hash
 	}

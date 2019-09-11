@@ -6,36 +6,65 @@ mod identity;
 mod lamport_clock;
 mod entry;
 
-#[allow(unused_imports)]
-use std::rc::Rc;
-
-#[allow(unused_imports)]
-use std::io::Cursor;
-#[allow(unused_imports)]
-use ipfs_api::IpfsClient;
-#[allow(unused_imports)]
-use hyper::rt::Future;
-
-#[allow(unused_imports)]
-use gset::GSet;
-#[allow(unused_imports)]
-use lamport_clock::LamportClock;
-#[allow(unused_imports)]
-use identity::Identity;
-#[allow(unused_imports)]
-use log::Log;
-#[allow(unused_imports)]
-use log::AdHocAccess;
-#[allow(unused_imports)]
-use entry::Entry;
-#[allow(unused_imports)]
-use entry::EntryOrHash;
-
 #[cfg(test)]
 mod tests {
-	use super::*;
+	use std::rc::Rc;
+	use std::io::Cursor;
+
+	use ipfs_api::IpfsClient;
+	use hyper::rt::Future;
+
+	use super::gset::GSet;
+	use super::lamport_clock::LamportClock;
+	use super::identity::Identity;
+	use super::log::Log;
+	use super::log::AdHocAccess;
+	use super::entry::Entry;
+	use super::entry::EntryOrHash;
+
+	fn identity () -> Identity {
+		Identity::new("identity","public","id_signature","public_signature")
+	}
 
 	#[test]
+	fn set_id () {
+		let log = Log::new(identity(),Some("ABC"),AdHocAccess,&[],&[],None,None);
+		assert_eq!(log.id(),"ABC");
+	}
+
+	#[test]
+	fn set_clock_id () {
+		let id = identity();
+		let log = Log::new(id.clone(),Some("ABC"),AdHocAccess,&[],&[],None,None);
+		assert_eq!(log.clock().id(),id.public_key());
+	}
+
+	#[test]
+	fn set_items () {
+		let id = identity();
+		let e1 = Entry::create(id.clone(),"A","entryA",&[],Some(LamportClock::new("A")));
+		let e2 = Entry::create(id.clone(),"A","entryB",&[],Some(LamportClock::new("B")));
+		let e3 = Entry::create(id.clone(),"A","entryC",&[],Some(LamportClock::new("C")));
+		let log = Log::new(id.clone(),Some("A"),AdHocAccess,&[e1,e2,e3],&[],None,None);
+		assert_eq!(log.len(),3);
+		assert_eq!(log.values()[0].payload(),"entryA");
+		assert_eq!(log.values()[1].payload(),"entryB");
+		assert_eq!(log.values()[2].payload(),"entryC");
+	}
+
+	#[test]
+	fn set_heads () {
+		let id = identity();
+		let e1 = Entry::create(id.clone(),"A","entryA",&[],None);
+		let e2 = Entry::create(id.clone(),"A","entryB",&[],None);
+		let e3 = Entry::create(id.clone(),"A","entryC",&[],None);
+		let log = Log::new(id.clone(),Some("B"),AdHocAccess,&[e1,e2,e3.clone()],&[e3.clone()],None,None);
+		assert_eq!(log.heads().len(),1);
+		assert_eq!(log.heads()[0].hash(),e3.hash());
+	}
+
+	#[test]
+	#[ignore]
 	fn test_gset () {
 		let mut x: GSet<i32> = GSet::new();
 		assert!(x.is_empty());
@@ -63,6 +92,7 @@ mod tests {
 	}
 
 	#[test]
+	#[ignore]
 	fn test_clock () {
 		let mut x = LamportClock::new("0000");
 		let y = LamportClock::new("0001");
@@ -83,6 +113,7 @@ mod tests {
 	}
 
 	#[test]
+	#[ignore]
 	fn log_join () {
 		let id = Identity::new("0","1","2","3");
 		let log_id = "xyz";
@@ -134,6 +165,7 @@ mod tests {
 	}
 
 	#[test]
+	#[ignore]
 	fn ipfs () {
 		let client = IpfsClient::default();
 		let data = Cursor::new("tinamämmi");
