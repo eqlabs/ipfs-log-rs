@@ -144,6 +144,15 @@ impl Log {
 		&self.id
 	}
 
+	pub fn set_identity (&mut self, identity: Identity) {
+		let mut t_max = 0;
+		for h in &self.heads {
+			t_max = max(t_max,h.clock().time());
+		}
+		self.clock = LamportClock::new(identity.public_key()).set_time(t_max);
+		self.identity = identity;
+	}
+
 	pub fn clock (&self) -> &LamportClock {
 		&self.clock
 	}

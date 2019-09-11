@@ -22,26 +22,34 @@ mod tests {
 	use super::entry::Entry;
 	use super::entry::EntryOrHash;
 
-	fn identity () -> Identity {
-		Identity::new("identity","public","id_signature","public_signature")
+	fn identity1 () -> Identity {
+		Identity::new("userA","public","id_signature","public_signature")
+	}
+
+	fn identity2 () -> Identity {
+		Identity::new("userB","public","id_signature","public_signature")
+	}
+
+	fn identity3 () -> Identity {
+		Identity::new("userC","public","id_signature","public_signature")
 	}
 
 	#[test]
 	fn set_id () {
-		let log = Log::new(identity(),Some("ABC"),AdHocAccess,&[],&[],None,None);
+		let log = Log::new(identity1(),Some("ABC"),AdHocAccess,&[],&[],None,None);
 		assert_eq!(log.id(),"ABC");
 	}
 
 	#[test]
 	fn set_clock_id () {
-		let id = identity();
+		let id = identity1();
 		let log = Log::new(id.clone(),Some("ABC"),AdHocAccess,&[],&[],None,None);
 		assert_eq!(log.clock().id(),id.public_key());
 	}
 
 	#[test]
 	fn set_items () {
-		let id = identity();
+		let id = identity1();
 		let e1 = Entry::create(id.clone(),"A","entryA",&[],Some(LamportClock::new("A")));
 		let e2 = Entry::create(id.clone(),"A","entryB",&[],Some(LamportClock::new("B")));
 		let e3 = Entry::create(id.clone(),"A","entryC",&[],Some(LamportClock::new("C")));
@@ -54,7 +62,7 @@ mod tests {
 
 	#[test]
 	fn set_heads () {
-		let id = identity();
+		let id = identity1();
 		let e1 = Entry::create(id.clone(),"A","entryA",&[],None);
 		let e2 = Entry::create(id.clone(),"A","entryB",&[],None);
 		let e3 = Entry::create(id.clone(),"A","entryC",&[],None);
@@ -65,7 +73,7 @@ mod tests {
 
 	#[test]
 	fn find_heads () {
-		let id = identity();
+		let id = identity1();
 		let e1 = Entry::create(id.clone(),"A","entryA",&[],None);
 		let e2 = Entry::create(id.clone(),"A","entryB",&[],None);
 		let e3 = Entry::create(id.clone(),"A","entryC",&[],None);
@@ -79,13 +87,40 @@ mod tests {
 	#[test]
 	fn to_string () {
 		let expected = "five\n└─four\n  └─three\n    └─two\n      └─one\n";
-		let mut log = Log::new(identity(),Some("A"),AdHocAccess,&[],&[],None,None);
+		let mut log = Log::new(identity1(),Some("A"),AdHocAccess,&[],&[],None,None);
 		log.append("one",None);
 		log.append("two",None);
 		log.append("three",None);
 		log.append("four",None);
 		log.append("five",None);
 		assert_eq!(log.to_string(),expected);
+	}
+
+	//fix comparison after implementing genuine hashing
+	#[test]
+	fn get () {
+		let mut log = Log::new(identity1(),Some("AAA"),AdHocAccess,&[],&[],None,None);
+		log.append("one",None);
+		assert_eq!(log.get(log.values()[0].hash()).unwrap().hash(),"one");
+		assert_eq!(log.get("zero"),None);
+	}
+
+	#[test]
+	fn set_identity () {
+		let id1 = identity1();
+		let mut log = Log::new(id1.clone(),Some("AAA"),AdHocAccess,&[],&[],None,None);
+		log.append("one",None);
+		assert_eq!(log.values()[0].clock().id(),id1.public_key());
+		assert_eq!(log.values()[0].clock().time(),1);
+		let id2 = identity2();
+		log.set_identity(id2.clone());
+		log.append("two",None);
+		assert_eq!(log.values()[1].clock().id(),id2.public_key());
+		assert_eq!(log.values()[1].clock().time(),2);
+		let id3 = identity3();
+		log.append("three",None);
+		assert_eq!(log.values()[2].clock().id(),id3.public_key());
+		assert_eq!(log.values()[2].clock().time(),3);
 	}
 
 	#[test]
