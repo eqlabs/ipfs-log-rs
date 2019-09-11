@@ -45,7 +45,7 @@ mod tests {
 		let e1 = Entry::create(id.clone(),"A","entryA",&[],Some(LamportClock::new("A")));
 		let e2 = Entry::create(id.clone(),"A","entryB",&[],Some(LamportClock::new("B")));
 		let e3 = Entry::create(id.clone(),"A","entryC",&[],Some(LamportClock::new("C")));
-		let log = Log::new(id.clone(),Some("A"),AdHocAccess,&[e1,e2,e3],&[],None,None);
+		let log = Log::new(id,Some("A"),AdHocAccess,&[e1,e2,e3],&[],None,None);
 		assert_eq!(log.len(),3);
 		assert_eq!(log.values()[0].payload(),"entryA");
 		assert_eq!(log.values()[1].payload(),"entryB");
@@ -58,9 +58,34 @@ mod tests {
 		let e1 = Entry::create(id.clone(),"A","entryA",&[],None);
 		let e2 = Entry::create(id.clone(),"A","entryB",&[],None);
 		let e3 = Entry::create(id.clone(),"A","entryC",&[],None);
-		let log = Log::new(id.clone(),Some("B"),AdHocAccess,&[e1,e2,e3.clone()],&[e3.clone()],None,None);
+		let log = Log::new(id,Some("B"),AdHocAccess,&[e1,e2,e3.clone()],&[e3.clone()],None,None);
 		assert_eq!(log.heads().len(),1);
 		assert_eq!(log.heads()[0].hash(),e3.hash());
+	}
+
+	#[test]
+	fn find_heads () {
+		let id = identity();
+		let e1 = Entry::create(id.clone(),"A","entryA",&[],None);
+		let e2 = Entry::create(id.clone(),"A","entryB",&[],None);
+		let e3 = Entry::create(id.clone(),"A","entryC",&[],None);
+		let log = Log::new(id,Some("A"),AdHocAccess,&[e1.clone(),e2.clone(),e3.clone()],&[],None,None);
+		assert_eq!(log.heads().len(),3);
+		assert_eq!(log.heads()[2].hash(),e1.hash());
+		assert_eq!(log.heads()[1].hash(),e2.hash());
+		assert_eq!(log.heads()[0].hash(),e3.hash());
+	}
+
+	#[test]
+	fn to_string () {
+		let expected = "five\n└─four\n  └─three\n    └─two\n      └─one\n";
+		let mut log = Log::new(identity(),Some("A"),AdHocAccess,&[],&[],None,None);
+		log.append("one",None);
+		log.append("two",None);
+		log.append("three",None);
+		log.append("four",None);
+		log.append("five",None);
+		assert_eq!(log.to_string(),expected);
 	}
 
 	#[test]
