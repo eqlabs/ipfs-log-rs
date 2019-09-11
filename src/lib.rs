@@ -109,17 +109,17 @@ mod tests {
 		println!("x:\t\t{}\ny:\t\t{}\nz:\t\t{}",x.all(),y.all(),z.all());
 
 		println!("diff z-y\t{:?}",z.diff(&y).iter().map(|x| x.1.hash().to_owned()).collect::<Vec<_>>());
-		y.join(&z,Some(4));
-		println!("join z+y = y\t{}\n",y.all());
+		y.join(&z,None);
+		println!("\n<<join z+y = y>\n{}>\n",y);
 		println!("----\t\ty\t\t----\n{}",y.entries());
 		//println!("diff y-z\t{:?}",y.diff(&z).iter().map(|x| x.1.hash().to_owned()).collect::<Vec<_>>());
 		//z.join(&y,None);
-		//println!("join y+z = z\t{}",z.all());
+		//println!("\n<<join y+z = z>\n{}>",z);
 		//println!("----\t\tz\t\t----\n{}",z.entries());
 
 		println!("diff z-y\t{:?}",z.diff(&y).iter().map(|x| x.1.hash().to_owned()).collect::<Vec<_>>());
 		y.join(&z,None);
-		println!("join z+y = y\t{}\n",y.all());
+		println!("\n<<join z+y = y>\n{}>\n",y);
 		println!("----\t\ty\t\t----\n{}",y.entries());
 
 		println!("y (json)\t{}\n",y.json());
@@ -128,8 +128,8 @@ mod tests {
 		assert_eq!(y.json(),String::from_utf8(y.buffer()).unwrap());
 
 		println!("diff y-x\t{:?}",y.diff(&x).iter().map(|x| x.1.hash().to_owned()).collect::<Vec<_>>());
-		x.join(&y,Some(6));
-		println!("join y+x = x\t{}\n",x.all());
+		x.join(&y,Some(10));
+		println!("\n<<join y+x = x>\n{}>\n",x);
 		println!("----\t\tx\t\t----\n{}",x.entries());
 	}
 

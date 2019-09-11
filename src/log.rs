@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::cmp::max;
 use std::time::SystemTime;
 use std::rc::Rc;
+use std::fmt::{Display,Formatter,Result};
 use serde_json::json;
 use crate::entry::Entry;
 use crate::entry::EntryOrHash;
@@ -435,6 +436,28 @@ impl Log {
 			}
 			diff
 		})
+	}
+}
+
+impl Display for Log {
+	fn fmt (&self, f: &mut Formatter) -> Result {
+		let mut es = self.values();
+		es.reverse();
+		let mut s = String::new();
+		for e in es {
+			let parents = Entry::find_children(&e,&self.values());
+			if parents.len() >= 1 {
+				if parents.len() >= 2 {
+					for _ in 0..parents.len() - 1 {
+						s.push_str("  ");
+					}
+				}
+				s.push_str("└─");
+			}
+			s.push_str(e.payload());
+			s.push_str("\n");
+		}
+		write!(f,"{}",s)
 	}
 }
 

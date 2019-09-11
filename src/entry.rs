@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::rc::Rc;
 use serde::Serialize;
 use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
@@ -58,12 +59,32 @@ impl Entry {
 		&self.id
 	}
 
+	pub fn payload (&self) -> &str {
+		&self.payload
+	}
+
 	pub fn next (&self) -> &Vec<String> {
 		&self.next
 	}
 
 	pub fn clock (&self) -> &LamportClock {
 		&self.clock
+	}
+
+	pub fn is_parent (e1: &Entry, e2: &Entry) -> bool {
+		e2.next().iter().any(|x| x == e1.hash())
+	}
+
+	pub fn find_children (entry: &Entry, entries: &[Rc<Entry>]) -> Vec<Rc<Entry>> {
+		let mut stack = Vec::new();
+		let mut parent = entries.iter().find(|e| Entry::is_parent(entry,e));
+		while let Some(p) = parent {
+			stack.push(p.clone());
+			let prev = p;
+			parent = entries.iter().find(|e| Entry::is_parent(prev,e));
+		}
+		stack.sort_by(|a,b| a.clock().time().cmp(&b.clock().time()));
+		stack
 	}
 }
 
