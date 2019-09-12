@@ -13,6 +13,7 @@ mod tests {
 
 	use ipfs_api::IpfsClient;
 	use hyper::rt::Future;
+	use serde_json::json;
 
 	use super::gset::GSet;
 	use super::lamport_clock::LamportClock;
@@ -122,6 +123,39 @@ mod tests {
 		log.append("three",None);
 		assert_eq!(log.values()[2].clock().id(),id3.public_key());
 		assert_eq!(log.values()[2].clock().time(),3);
+	}
+
+	//implement later
+	#[test]
+	fn has () {
+	}
+
+	//fix comparisons after implementing genuine hashing
+	#[test]
+	fn serialize () {
+		let expected = json!({
+			"id": "AAA",
+			"heads": ["three"],
+		}).to_string();
+		let mut log = Log::new(identity1(),LogOptions::new().id("AAA"));
+		log.append("one",None);
+		log.append("two",None);
+		log.append("three",None);
+		assert_eq!(log.json(),expected);
+		//...
+	}
+
+	#[test]
+	fn values () {
+		let mut log = Log::new(identity1(),LogOptions::new());
+		assert_eq!(log.len(),0);
+		log.append("hello1",None);
+		log.append("hello2",None);
+		log.append("hello3",None);
+		assert_eq!(log.len(),3);
+		assert_eq!(log.values()[0].payload(),"hello1");
+		assert_eq!(log.values()[1].payload(),"hello2");
+		assert_eq!(log.values()[2].payload(),"hello3");
 	}
 
 	/*
