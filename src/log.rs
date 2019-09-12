@@ -27,7 +27,7 @@ impl Log {
 	pub fn new (identity: Identity, id: Option<&str>, access: AdHocAccess,
 	entries: &[Rc<Entry>], heads: &[Rc<Entry>], clock: Option<LamportClock>,
 	fn_sort: Option<Box<dyn Fn(&Entry,&Entry) -> Ordering>>) -> Log {
-		let fn_sort = Log::no_zeroes(fn_sort.unwrap_or(Box::new(Log::last_write_wins)));
+		let fn_sort = Box::new(Log::no_zeroes(fn_sort.unwrap_or(Box::new(Log::last_write_wins))));
 		let id = if let Some(s) = id {
 			s.to_owned()
 		}
@@ -408,43 +408,43 @@ impl Log {
 		Log::sort_step_by_step(|a,b| a.hash().cmp(&b.hash()))(a,b)
 	}
 
-	pub fn sort_step_by_step<F> (resolve: F) -> Box<dyn Fn(&Entry,&Entry) -> Ordering>
+	pub fn sort_step_by_step<F> (resolve: F) -> impl Fn(&Entry,&Entry) -> Ordering
 	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
-		Box::new(Log::sort_by_clocks(Log::sort_by_clock_ids(resolve)))
+		Log::sort_by_clocks(Log::sort_by_clock_ids(resolve))
 	}
 
-	pub fn sort_by_clocks<F> (resolve: F) -> Box<dyn Fn(&Entry,&Entry) -> Ordering>
+	pub fn sort_by_clocks<F> (resolve: F) -> impl Fn(&Entry,&Entry) -> Ordering
 	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
-		Box::new(move |a,b| {
+		move |a,b| {
 			let mut diff = a.clock().cmp(&b.clock());
 			if diff == Ordering::Equal {
 				diff = resolve(a,b);
 			}
 			diff
-		})
+		}
 	}
 
-	pub fn sort_by_clock_ids<F> (resolve: F) -> Box<dyn Fn(&Entry,&Entry) -> Ordering>
+	pub fn sort_by_clock_ids<F> (resolve: F) -> impl Fn(&Entry,&Entry) -> Ordering
 	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
-		Box::new(move |a,b| {
+		move |a,b| {
 			let mut diff = a.clock().id().cmp(&b.clock().id());
 			if diff == Ordering::Equal {
 				diff = resolve(a,b);
 			}
 			diff
-		})
+		}
 	}
 
-	pub fn no_zeroes<F> (fn_sort: F) -> Box<dyn Fn(&Entry,&Entry) -> Ordering>
+	pub fn no_zeroes<F> (fn_sort: F) -> impl Fn(&Entry,&Entry) -> Ordering
 	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
-		Box::new(move |a,b| {
+		move |a,b| {
 			let diff = fn_sort(a,b);
 			if diff == Ordering::Equal {
 				panic!("Your log's tiebreaker function {}",
 				"has returned zero and therefore cannot be");
 			}
 			diff
-		})
+		}
 	}
 }
 
