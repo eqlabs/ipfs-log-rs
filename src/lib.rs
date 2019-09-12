@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 mod log;
-mod gset;
 mod identity;
 mod lamport_clock;
 mod entry;
@@ -15,7 +14,6 @@ mod tests {
 	use hyper::rt::Future;
 	use serde_json::json;
 
-	use super::gset::GSet;
 	use super::lamport_clock::LamportClock;
 	use super::identity::Identity;
 	use super::log::Log;
@@ -158,35 +156,6 @@ mod tests {
 		assert_eq!(log.values()[2].payload(),"hello3");
 	}
 
-	/*
-	#[test]
-	#[ignore]
-	fn test_gset () {
-		let mut x: GSet<i32> = GSet::new();
-		assert!(x.is_empty());
-		x.insert(2);
-		x.insert(3);
-		x.insert(5);
-		x.insert(8);
-		assert!(!x.is_empty());
-		assert_eq!(x.len(),4);
-		let mut y: GSet<i32> = GSet::new();
-		y.insert(4);
-		y.insert(5);
-		y.insert(10);
-		y.insert(12);
-		assert!(!x.is_subset(&y));
-		assert!(!y.is_subset(&x));
-		let z = GSet::union(&x,&y);
-		assert_eq!(z.len(),7);
-		let mut w = GSet::new();
-		w.insert(2);
-		w.insert(4);
-		w.insert(8);
-		assert!(w.is_subset(&z));
-		assert!(!z.is_subset(&w));
-	}
-
 	#[test]
 	#[ignore]
 	fn test_clock () {
@@ -213,8 +182,7 @@ mod tests {
 	fn log_join () {
 		let id = Identity::new("0","1","2","3");
 		let log_id = "xyz";
-		let acc = AdHocAccess;
-		let mut x = Log::new(id.clone(),Some(log_id),acc,&[],&[],None,None);
+		let mut x = Log::new(id.clone(),LogOptions::new().id(log_id));
 		x.append("to",None);
 		x.append("set",None);
 		x.append("your",None);
@@ -224,11 +192,11 @@ mod tests {
 		let e3 = Entry::new(id.clone(),log_id,"third",&[],None);
 		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e3)],None);
 		let es = &[Rc::new(e1),Rc::new(e2),Rc::new(e3)];
-		let mut y = Log::new(id.clone(),Some(log_id),acc,es,&[],None,None);
+		let mut y = Log::new(id.clone(),LogOptions::new().id(log_id).entries(es));
 		y.append("fifth",None);
 		y.append("seventh",None);
 
-		let mut z = Log::new(id.clone(),Some(log_id),acc,es,&[],None,None);
+		let mut z = Log::new(id.clone(),LogOptions::new().id(log_id).entries(es));
 		z.append("fourth",None);
 		z.append("sixth",None);
 		z.append("eighth",None);
@@ -267,5 +235,5 @@ mod tests {
 		let data = Cursor::new("tinamämmi");
 		let request = client.add(data).map(|r| println!("ipfs/{}",r.hash)).map_err(|e| eprintln!("{}",e));
 		hyper::rt::run(request);
-	}*/
+	}
 }
