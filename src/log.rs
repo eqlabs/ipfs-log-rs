@@ -144,8 +144,15 @@ impl Log {
 				heads.push(e.clone());
 			}
 		}
-		//inequality correct?
-		heads.sort_by(|a,b| b.clock().id().cmp(a.clock().id()));
+		heads.sort_by(|a,b| {
+			let diff = a.clock().id().cmp(b.clock().id());
+			if diff == Ordering::Equal {
+				Ordering::Less
+			}
+			else {
+				diff
+			}
+		});
 		heads
 	}
 
