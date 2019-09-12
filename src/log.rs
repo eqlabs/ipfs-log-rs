@@ -23,10 +23,64 @@ pub struct Log {
 	clock: LamportClock,
 }
 
+pub struct LogOptions<'a> {
+	id: Option<&'a str>,
+	access: AdHocAccess,
+	entries: &'a[Rc<Entry>],
+	heads: &'a[Rc<Entry>],
+	clock: Option<LamportClock>,
+	fn_sort: Option<Box<dyn Fn(&Entry,&Entry) -> Ordering>>,
+}
+
+impl<'a> LogOptions<'a> {
+	pub fn new () -> LogOptions<'a> {
+		LogOptions::default()
+	}
+
+	pub fn id (mut self, id: &'a str) -> LogOptions {
+		self.id = Some(id);
+		self
+	}
+
+	pub fn entries (mut self, es: &'a[Rc<Entry>]) -> LogOptions {
+		self.entries = es;
+		self
+	}
+
+	pub fn heads (mut self, hs: &'a[Rc<Entry>]) -> LogOptions {
+		self.heads = hs;
+		self
+	}
+
+	pub fn clock (mut self, clock: LamportClock) -> LogOptions<'a> {
+		self.clock = Some(clock);
+		self
+	}
+
+	pub fn fn_sort<F> (mut self, fn_sort: F) -> LogOptions<'a>
+	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
+		self.fn_sort = Some(Box::new(fn_sort));
+		self
+	}
+}
+
+impl<'a> Default for LogOptions<'a> {
+	fn default () -> Self {
+		LogOptions {
+			id: None,
+			access: AdHocAccess,
+			entries: &[],
+			heads: &[],
+			clock: None,
+			fn_sort: None,
+		}
+	}
+}
+
 impl Log {
-	pub fn new (identity: Identity, id: Option<&str>, access: AdHocAccess,
-	entries: &[Rc<Entry>], heads: &[Rc<Entry>], clock: Option<LamportClock>,
-	fn_sort: Option<Box<dyn Fn(&Entry,&Entry) -> Ordering>>) -> Log {
+	pub fn new (identity: Identity, opts: LogOptions) -> Log {
+		let (id, access, entries, heads, clock, fn_sort) =
+		(opts.id, opts.access, opts.entries, opts.heads, opts.clock, opts.fn_sort);
 		let fn_sort = Box::new(Log::no_zeroes(fn_sort.unwrap_or(Box::new(Log::last_write_wins))));
 		let id = if let Some(s) = id {
 			s.to_owned()
