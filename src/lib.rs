@@ -9,10 +9,13 @@ mod entry;
 mod tests {
 	use std::rc::Rc;
 	use std::io::Cursor;
+	use std::future::Future as Ftr;
 
 	use ipfs_api::IpfsClient;
 	use hyper::rt::Future;
 	use serde_json::json;
+	use wasm_bindgen::prelude::*;
+	use wasm_bindgen_futures::JsFuture;
 
 	use super::lamport_clock::LamportClock;
 	use super::identity::Identity;
@@ -235,5 +238,51 @@ mod tests {
 		let data = Cursor::new("tinamämmi");
 		let request = client.add(data).map(|r| println!("ipfs/{}",r.hash)).map_err(|e| eprintln!("{}",e));
 		hyper::rt::run(request);
+	}
+
+	#[wasm_bindgen(module = "/js/orbit-db-identity-provider.js")]
+	extern "C" {
+		type IdentityProvider;
+
+		#[wasm_bindgen(constructor)]
+		fn new (options: JsValue) -> IdentityProvider;
+		#[wasm_bindgen(static_method_of = IdentityProvider,getter)]
+		fn r#type () -> JsValue;
+		#[wasm_bindgen(catch,method)]
+		fn get_id (this: &IdentityProvider, options: JsValue) -> Result<JsValue,JsValue>;
+		#[wasm_bindgen(catch,method)]
+		fn sign_identity (this: &IdentityProvider, data: &str, options: JsValue) -> Result<JsValue,JsValue>;
+		#[wasm_bindgen(static_method_of = IdentityProvider)]
+		fn verify_identity (identity: JsValue) -> JsValue;
+	}
+
+	#[wasm_bindgen(module = "/js/keystore.js")]
+	extern "C" {
+		type Keystore;
+
+		#[wasm_bindgen(constructor)]
+		fn new () -> Keystore;
+
+		#[wasm_bindgen(method)]
+		fn open (this: &Keystore) -> JsValue;
+		#[wasm_bindgen(method)]
+		fn close (this: &Keystore);
+		#[wasm_bindgen(catch,method)]
+		fn has_key (this: &Keystore, id: &str) -> Result<JsValue,JsValue>;
+		#[wasm_bindgen(catch,method)]
+		fn create_key (this: &Keystore, id: &str) -> Result<JsValue,JsValue>;
+		#[wasm_bindgen(catch,method)]
+		fn get_key (this: &Keystore, id: &str) -> Result<JsValue,JsValue>;
+		#[wasm_bindgen(catch,method)]
+		fn sign (this: &Keystore, key: JsValue, data: &str) -> Result<JsValue,JsValue>;
+		#[wasm_bindgen(catch,method)]
+		fn get_public (this: &Keystore, keys: JsValue, options: JsValue) -> Result<JsValue,JsValue>;
+		#[wasm_bindgen(catch,static_method_of = Keystore)]
+		fn verify (signature: &str, public_key: &str, data: &str, v: &str) -> Result<JsValue,JsValue>;
+	}
+
+	#[test]
+	fn wasm () {
+		let x = IdentityProvider::new(JsValue::null());
 	}
 }
