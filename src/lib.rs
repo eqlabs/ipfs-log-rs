@@ -14,6 +14,8 @@ mod tests {
 	use ipfs_api::IpfsClient;
 	use hyper::rt::Future;
 	use serde_json::json;
+	use secp256k1::{Secp256k1,Message};
+	use rand::OsRng;
 	use wasm_bindgen::prelude::*;
 	use wasm_bindgen_futures::JsFuture;
 
@@ -240,6 +242,17 @@ mod tests {
 		hyper::rt::run(request);
 	}
 
+	#[test]
+	fn keys () {
+		let secp = Secp256k1::new();
+		let mut rng = OsRng::new().expect("OsRng");
+		let (secret,public) = secp.generate_keypair(&mut rng);
+		let msg = Message::from_slice(&[0x64;32]).expect("32 bytes");
+		let sig = secp.sign(&msg,&secret);
+		println!("{}\n*\n{:?}\n=\n{}",&secret,&msg,&sig);
+		assert!(secp.verify(&msg,&sig,&public).is_ok());
+	}
+
 	#[wasm_bindgen(module = "/js/orbit-db-identity-provider.js")]
 	extern "C" {
 		type IdentityProvider;
@@ -282,6 +295,7 @@ mod tests {
 	}
 
 	#[test]
+	#[ignore]
 	fn wasm () {
 		let x = IdentityProvider::new(JsValue::null());
 	}
