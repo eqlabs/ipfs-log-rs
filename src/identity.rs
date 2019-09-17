@@ -103,13 +103,13 @@ impl Identificator for OrbitDbIdentificator {
 		let secp = Secp256k1::new();
 		let mut rng = OsRng::new().unwrap();
 		let (secret_key,id_hash) = secp.generate_keypair(&mut rng);
-		let (sk,ih) = (&secret_key.to_string(),&id_hash.to_string());
+		let (sk,ih) = (&secret_key.to_string(),&id_hash.serialize_uncompressed().iter().map(|&x| format!("{:02x}",x)).collect::<String>());
 
 		self.put(id,sk);
 		self.put(sk,ih);
 
 		let (middle_key,public_key) = secp.generate_keypair(&mut rng);
-		let (mk,pk) = (&middle_key.to_string(),&public_key.to_string());
+		let (mk,pk) = (&middle_key.to_string(),&public_key.serialize_uncompressed().iter().map(|&x| format!("{:02x}",x)).collect::<String>());
 		self.put(ih,mk);
 		self.put(mk,pk);
 
