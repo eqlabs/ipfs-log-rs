@@ -16,7 +16,8 @@ mod tests {
 
 	use super::lamport_clock::LamportClock;
 	use super::identity::Identity;
-	use super::identity::IdentityProvider;
+	use super::identity::OrbitDbIdentificator;
+	use super::identity::Identificator;
 	use super::identity::IdAndKey;
 	use super::log::Log;
 	use super::log::LogOptions;
@@ -240,7 +241,7 @@ mod tests {
 
 	#[test]
 	fn keys () {
-		let mut idpr = IdentityProvider::new();
+		let mut idpr = OrbitDbIdentificator::new();
 		let id = idpr.create("local_id");
 		println!("{},\n{},\n{},\n{}",id.id(),id.pub_key(),id.signatures().id(),id.signatures().pub_key());
 	}

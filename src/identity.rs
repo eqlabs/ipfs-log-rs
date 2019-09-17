@@ -74,18 +74,32 @@ impl PartialOrd for Identity {
 	}
 }
 
-pub struct IdentityProvider {
+pub trait Identificator {
+	fn create (&mut self, id: &str) -> Identity;
+}
+
+pub struct OrbitDbIdentificator {
 	keystore: HashMap<String,String>,
 }
 
-impl IdentityProvider {
-	pub fn new () -> IdentityProvider {
-		IdentityProvider {
+impl OrbitDbIdentificator {
+	pub fn new () -> OrbitDbIdentificator {
+		OrbitDbIdentificator {
 			keystore: HashMap::new(),
 		}
 	}
 
-	pub fn create (&mut self, id: &str) -> Identity {
+	fn put (&mut self, k: &str, v: &str) {
+		self.keystore.insert(k.to_owned(),v.to_owned());
+	}
+
+	pub fn get (&self, k: &str) -> Option<&String> {
+		self.keystore.get(k)
+	}
+}
+
+impl Identificator for OrbitDbIdentificator {
+	fn create (&mut self, id: &str) -> Identity {
 		let secp = Secp256k1::new();
 		let mut rng = OsRng::new().unwrap();
 		let (secret_key,id_hash) = secp.generate_keypair(&mut rng);
@@ -111,13 +125,5 @@ impl IdentityProvider {
 		let pub_sign = secp.sign(&Message::from_slice(&dig).unwrap(),&secret_key);
 
 		Identity::new(ih,pk,&id_sign.to_string(),&pub_sign.to_string())
-	}
-
-	fn put (&mut self, k: &str, v: &str) {
-		self.keystore.insert(k.to_owned(),v.to_owned());
-	}
-
-	pub fn get (&self, k: &str) -> Option<&String> {
-		self.keystore.get(k)
 	}
 }
