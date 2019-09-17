@@ -9,6 +9,7 @@ use serde_json::json;
 use crate::entry::Entry;
 use crate::entry::EntryOrHash;
 use crate::identity::Identity;
+use crate::identity::IdAndKey;
 use crate::lamport_clock::LamportClock;
 
 pub struct Log {
@@ -116,7 +117,7 @@ impl Log {
 		for h in &heads {
 			t_max = max(t_max,h.clock().time());
 		}
-		let clock = LamportClock::new(identity.public_key()).set_time(t_max);
+		let clock = LamportClock::new(identity.pub_key()).set_time(t_max);
 
 		Log {
 			id: id,
@@ -210,7 +211,7 @@ impl Log {
 		for h in &self.heads {
 			t_max = max(t_max,h.clock().time());
 		}
-		self.clock = LamportClock::new(identity.public_key()).set_time(t_max);
+		self.clock = LamportClock::new(identity.pub_key()).set_time(t_max);
 		self.identity = identity;
 	}
 

@@ -3,6 +3,7 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
+use crate::identity::IdAndKey;
 
 pub enum EntryOrHash<'a> {
 	Entry(&'a Entry),
@@ -47,7 +48,7 @@ impl Entry {
 			payload: data.to_owned(),
 			next: next,
 			v: 1,
-			clock: clock.unwrap_or(LamportClock::new(identity.public_key())),
+			clock: clock.unwrap_or(LamportClock::new(identity.pub_key())),
 		}
 	}
 

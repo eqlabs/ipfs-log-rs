@@ -1,39 +1,64 @@
+use std::collections::HashMap;
 use std::cmp::Ordering;
 
+use sha2::{Sha256,Digest};
+use secp256k1::{Secp256k1,Message};
+use rand::rngs::OsRng;
+
+pub trait IdAndKey {
+	fn id (&self) -> &str;
+	fn pub_key (&self) -> &str;
+}
+
 #[derive(Eq,PartialEq,Clone)]
-struct Signatures {
+pub struct Signatures {
 	id: String,
-	public_key: String,
+	pub_key: String,
+}
+
+impl IdAndKey for Signatures {
+	fn id (&self) -> &str {
+		&self.id
+	}
+
+	fn pub_key (&self) -> &str {
+		&self.pub_key
+	}
 }
 
 #[derive(Eq,PartialEq,Clone)]
 pub struct Identity {
 	id: String,
-	public_key: String,
+	pub_key: String,
 	signatures: Signatures,
 	//type,
 	//provider,
 }
 
 impl Identity {
-	pub fn new (id: &str, public_key: &str,
-	id_signature: &str, public_key_id_signature: &str) -> Identity {
+	pub fn new (id: &str, pub_key: &str, id_sign: &str, pub_sign: &str) -> Identity {
 		Identity {
 			id: id.to_owned(),
-			public_key: public_key.to_owned(),
+			pub_key: pub_key.to_owned(),
 			signatures: Signatures {
-				id: id_signature.to_owned(),
-				public_key: public_key_id_signature.to_owned(),
+				id: id_sign.to_owned(),
+				pub_key: pub_sign.to_owned(),
 			},
 		}
 	}
 
-	pub fn id (&self) -> &str {
+	pub fn signatures (&self) -> &Signatures {
+		&self.signatures
+	}
+}
+
+impl IdAndKey for Identity {
+	fn id (&self) -> &str {
 		&self.id
 	}
 
-	pub fn public_key (&self) -> &str {
-		&self.public_key
+	fn pub_key (&self) -> &str {
+		&self.pub_key
 	}
 }
 
@@ -49,22 +74,50 @@ impl PartialOrd for Identity {
 	}
 }
 
-//very much ad hoc
-pub struct IdentityBuilder {
-	id: u64,
+pub struct IdentityProvider {
+	keystore: HashMap<String,String>,
 }
 
-impl IdentityBuilder {
-	pub fn new () -> IdentityBuilder {
-		IdentityBuilder {
-			id: 0,
+impl IdentityProvider {
+	pub fn new () -> IdentityProvider {
+		IdentityProvider {
+			keystore: HashMap::new(),
 		}
 	}
 
-	pub fn build (&mut self) -> Identity {
-		let gen = |a| format!("{}{}",a,self.id);
-		let i = Identity::new(&gen("000"),&gen("111"),&gen("222"),&gen("333"));
-		self.id += 1;
-		i
+	pub fn create (&mut self, id: &str) -> Identity {
+		let secp = Secp256k1::new();
+		let mut rng = OsRng::new().unwrap();
+		let (secret_key,id_hash) = secp.generate_keypair(&mut rng);
+		let (sk,ih) = (&secret_key.to_string(),&id_hash.to_string());
+
+		self.put(id,sk);
+		self.put(sk,ih);
+
+		let (middle_key,public_key) = secp.generate_keypair(&mut rng);
+		let (mk,pk) = (&middle_key.to_string(),&public_key.to_string());
+		self.put(ih,mk);
+		self.put(mk,pk);
+
+		let mut hasher = Sha256::new();
+		hasher.input(ih.as_bytes());
+		let mut dig = hasher.result();
+		let id_sign = secp.sign(&Message::from_slice(&dig).unwrap(),&middle_key);
+		let mut pkis = pk.to_owned();
+		pkis.push_str(&id_sign.to_string());
+		let mut hasher = Sha256::new();
+		hasher.input(pkis.as_bytes());
+		dig = hasher.result();
+		let pub_sign = secp.sign(&Message::from_slice(&dig).unwrap(),&secret_key);
+
+		Identity::new(ih,pk,&id_sign.to_string(),&pub_sign.to_string())
+	}
+
+	fn put (&mut self, k: &str, v: &str) {
+		self.keystore.insert(k.to_owned(),v.to_owned());
+	}
+
+	pub fn get (&self, k: &str) -> Option<&String> {
+		self.keystore.get(k)
 	}
 }

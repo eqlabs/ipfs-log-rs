@@ -13,12 +13,11 @@ mod tests {
 	use ipfs_api::IpfsClient;
 	use hyper::rt::Future;
 	use serde_json::json;
-	use sha2::{Sha256,Digest};
-	use secp256k1::{Secp256k1,Message};
-	use rand::rngs::OsRng;
 
 	use super::lamport_clock::LamportClock;
 	use super::identity::Identity;
+	use super::identity::IdentityProvider;
+	use super::identity::IdAndKey;
 	use super::log::Log;
 	use super::log::LogOptions;
 	use super::entry::Entry;
@@ -46,7 +45,7 @@ mod tests {
 	fn set_clock_id () {
 		let id = identity1();
 		let log = Log::new(id.clone(),LogOptions::new().id("ABC"));
-		assert_eq!(log.clock().id(),id.public_key());
+		assert_eq!(log.clock().id(),id.pub_key());
 	}
 
 	#[test]
@@ -112,16 +111,16 @@ mod tests {
 		let id1 = identity1();
 		let mut log = Log::new(id1.clone(),LogOptions::new().id("AAA"));
 		log.append("one",None);
-		assert_eq!(log.values()[0].clock().id(),id1.public_key());
+		assert_eq!(log.values()[0].clock().id(),id1.pub_key());
 		assert_eq!(log.values()[0].clock().time(),1);
 		let id2 = identity2();
 		log.set_identity(id2.clone());
 		log.append("two",None);
-		assert_eq!(log.values()[1].clock().id(),id2.public_key());
+		assert_eq!(log.values()[1].clock().id(),id2.pub_key());
 		assert_eq!(log.values()[1].clock().time(),2);
 		let id3 = identity3();
 		log.append("three",None);
-		assert_eq!(log.values()[2].clock().id(),id3.public_key());
+		assert_eq!(log.values()[2].clock().id(),id3.pub_key());
 		assert_eq!(log.values()[2].clock().time(),3);
 	}
 
@@ -241,28 +240,8 @@ mod tests {
 
 	#[test]
 	fn keys () {
-		let secp = Secp256k1::new();
-		let mut rng = OsRng::new().expect("OsRng");
-		let (secret,public) = secp.generate_keypair(&mut rng);
-
-		/*
-		let msg = Message::from_slice(&[0x64;32]).expect("32 bytes");
-		let sig = secp.sign(&msg,&secret);
-		println!("{}\n*\n{:?}\n=\n{}",&secret,&msg,&sig);
-		assert!(secp.verify(&msg,&sig,&public).is_ok());*/
-
-		let id_key = ("myid",secret.clone());
-		let mut hasher = Sha256::new();
-		hasher.input(id_key.0.as_bytes());
-		let mut dig = hasher.result();
-		let id_sign = secp.sign(&Message::from_slice(&dig).unwrap(),&secret);
-		let mut pub_id = public.clone().to_string();
-		pub_id.push_str(&id_sign.clone().to_string());
-		let mut hasher = Sha256::new();
-		hasher.input(pub_id.as_bytes());
-		dig = hasher.result();
-		let pub_sign = secp.sign(&Message::from_slice(&dig).unwrap(),&secret);
-		let id = Identity::new(&secret.to_string(),&public.to_string(),&id_sign.to_string(),&pub_sign.to_string());
-		println!("\n({},\n{},\n{},\n{})\n",secret,public,id_sign,pub_sign);
+		let mut idpr = IdentityProvider::new();
+		let id = idpr.create("local_id");
+		println!("{},\n{},\n{},\n{}",id.id(),id.pub_key(),id.signatures().id(),id.signatures().pub_key());
 	}
 }
