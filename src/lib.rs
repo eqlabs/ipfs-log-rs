@@ -245,10 +245,10 @@ mod tests {
 		let id = idpr.create("local_id");
 
 		let key = idpr.get("local_id").unwrap();
-		let ext_id = idpr.get(key).unwrap();
+		let ext_id = key.pub_key();
 		let signer = idpr.get(ext_id).unwrap();
-		let pub_key = idpr.get(signer).unwrap();
-		assert_eq!(id.pub_key(),idpr.get(signer).unwrap());
+		let pub_key = signer.pub_key();
+		assert_eq!(id.pub_key(),signer.pub_key());
 
 		let id_sign = idpr.sign(ext_id,signer);
 		assert!(idpr.verify(ext_id,&id_sign,pub_key));

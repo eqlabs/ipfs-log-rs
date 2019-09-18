@@ -76,13 +76,35 @@ impl PartialOrd for Identity {
 	}
 }
 
+pub struct Keys {
+	sec_key: String,
+	pub_key: String,
+}
+
+impl Keys {
+	pub fn new (sk: &str, pk: &str) -> Keys {
+		Keys {
+			sec_key: sk.to_owned(),
+			pub_key: pk.to_owned(),
+		}
+	}
+
+	pub fn sec_key (&self) -> &str {
+		&self.sec_key
+	}
+
+	pub fn pub_key (&self) -> &str {
+		&self.pub_key
+	}
+}
+
 pub trait Identificator {
 	fn create (&mut self, id: &str) -> Identity;
 }
 
 pub struct OrbitDbIdentificator {
 	secp: Secp256k1<All>,
-	keystore: HashMap<String,String>,
+	keystore: HashMap<String,Keys>,
 }
 
 impl OrbitDbIdentificator {
@@ -93,11 +115,11 @@ impl OrbitDbIdentificator {
 		}
 	}
 
-	fn put (&mut self, k: &str, v: &str) {
-		self.keystore.insert(k.to_owned(),v.to_owned());
+	fn put (&mut self, k: &str, v: Keys) {
+		self.keystore.insert(k.to_owned(),v);
 	}
 
-	pub fn get (&self, k: &str) -> Option<&String> {
+	pub fn get (&self, k: &str) -> Option<&Keys> {
 		self.keystore.get(k)
 	}
 
@@ -113,27 +135,26 @@ impl OrbitDbIdentificator {
 		}
 	}
 
-	pub fn sign (&self, msg: &str, key: &str) -> String {
+	pub fn sign (&self, msg: &str, keys: &Keys) -> String {
 		let mut hasher = Sha256::new();
 		hasher.input(msg.as_bytes());
 		let dig = hasher.result();
-		self.secp.sign(&Message::from_slice(&dig).unwrap(),&SecretKey::from_slice(&hex::decode(key).unwrap()).unwrap()).to_string()
+		self.secp.sign(&Message::from_slice(&dig).unwrap(),
+		&SecretKey::from_slice(&hex::decode(keys.sec_key()).unwrap()).unwrap()).to_string()
 	}
 }
 
 impl Identificator for OrbitDbIdentificator {
 	fn create (&mut self, id: &str) -> Identity {
 		let mut rng = OsRng::new().unwrap();
+
 		let (secret_key,id_hash) = self.secp.generate_keypair(&mut rng);
 		let (sk,ih) = (&secret_key.to_string(),&id_hash.serialize_uncompressed().iter().map(|&x| format!("{:02x}",x)).collect::<String>());
-
-		self.put(id,sk);
-		self.put(sk,ih);
+		self.put(id,Keys::new(sk,ih));
 
 		let (middle_key,public_key) = self.secp.generate_keypair(&mut rng);
 		let (mk,pk) = (&middle_key.to_string(),&public_key.serialize_uncompressed().iter().map(|&x| format!("{:02x}",x)).collect::<String>());
-		self.put(ih,mk);
-		self.put(mk,pk);
+		self.put(ih,Keys::new(mk,pk));
 
 		let mut hasher = Sha256::new();
 		hasher.input(ih.as_bytes());
