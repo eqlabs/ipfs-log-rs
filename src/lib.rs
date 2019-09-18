@@ -240,9 +240,23 @@ mod tests {
 	}
 
 	#[test]
-	fn keys () {
+	fn identities () {
 		let mut idpr = OrbitDbIdentificator::new();
 		let id = idpr.create("local_id");
-		println!("{},\n{},\n{},\n{}",id.id(),id.pub_key(),id.signatures().id(),id.signatures().pub_key());
+
+		let key = idpr.get("local_id").unwrap();
+		let ext_id = idpr.get(key).unwrap();
+		let signer = idpr.get(ext_id).unwrap();
+		let pub_key = idpr.get(signer).unwrap();
+		assert_eq!(id.pub_key(),idpr.get(signer).unwrap());
+
+		let id_sign = idpr.sign(ext_id,signer);
+		assert!(idpr.verify(ext_id,&id_sign,pub_key));
+		assert_eq!(id.signatures().id(),id_sign);
+
+		let mut pub_key_id_sign = id.pub_key().to_owned();
+		pub_key_id_sign.push_str(&id_sign);
+		let pub_key_id_sign_sign = idpr.sign(&pub_key_id_sign,key);
+		assert_eq!(id.signatures().pub_key(),pub_key_id_sign_sign);
 	}
 }

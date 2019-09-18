@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::str::FromStr;
 
 use sha2::{Sha256,Digest};
-use secp256k1::{Secp256k1,Message};
+use secp256k1::{Secp256k1,Message,All,Signature,PublicKey,SecretKey};
 use rand::rngs::OsRng;
+use hex;
 
 pub trait IdAndKey {
 	fn id (&self) -> &str;
@@ -79,12 +81,14 @@ pub trait Identificator {
 }
 
 pub struct OrbitDbIdentificator {
+	secp: Secp256k1<All>,
 	keystore: HashMap<String,String>,
 }
 
 impl OrbitDbIdentificator {
 	pub fn new () -> OrbitDbIdentificator {
 		OrbitDbIdentificator {
+			secp: Secp256k1::new(),
 			keystore: HashMap::new(),
 		}
 	}
@@ -96,19 +100,37 @@ impl OrbitDbIdentificator {
 	pub fn get (&self, k: &str) -> Option<&String> {
 		self.keystore.get(k)
 	}
+
+	pub fn verify (&self, msg: &str, sig: &str, pk: &str) -> bool {
+		let mut hasher = Sha256::new();
+		hasher.input(msg.as_bytes());
+		let dig = hasher.result();
+		match self.secp.verify(&Message::from_slice(&dig).unwrap(),
+		&Signature::from_str(sig).unwrap(),
+		&PublicKey::from_slice(&hex::decode(pk).unwrap()).unwrap()) {
+			Ok(_)	=>	true,
+			_		=>	false,
+		}
+	}
+
+	pub fn sign (&self, msg: &str, key: &str) -> String {
+		let mut hasher = Sha256::new();
+		hasher.input(msg.as_bytes());
+		let dig = hasher.result();
+		self.secp.sign(&Message::from_slice(&dig).unwrap(),&SecretKey::from_slice(&hex::decode(key).unwrap()).unwrap()).to_string()
+	}
 }
 
 impl Identificator for OrbitDbIdentificator {
 	fn create (&mut self, id: &str) -> Identity {
-		let secp = Secp256k1::new();
 		let mut rng = OsRng::new().unwrap();
-		let (secret_key,id_hash) = secp.generate_keypair(&mut rng);
+		let (secret_key,id_hash) = self.secp.generate_keypair(&mut rng);
 		let (sk,ih) = (&secret_key.to_string(),&id_hash.serialize_uncompressed().iter().map(|&x| format!("{:02x}",x)).collect::<String>());
 
 		self.put(id,sk);
 		self.put(sk,ih);
 
-		let (middle_key,public_key) = secp.generate_keypair(&mut rng);
+		let (middle_key,public_key) = self.secp.generate_keypair(&mut rng);
 		let (mk,pk) = (&middle_key.to_string(),&public_key.serialize_uncompressed().iter().map(|&x| format!("{:02x}",x)).collect::<String>());
 		self.put(ih,mk);
 		self.put(mk,pk);
@@ -116,13 +138,13 @@ impl Identificator for OrbitDbIdentificator {
 		let mut hasher = Sha256::new();
 		hasher.input(ih.as_bytes());
 		let mut dig = hasher.result();
-		let id_sign = secp.sign(&Message::from_slice(&dig).unwrap(),&middle_key);
+		let id_sign = self.secp.sign(&Message::from_slice(&dig).unwrap(),&middle_key);
 		let mut pkis = pk.to_owned();
 		pkis.push_str(&id_sign.to_string());
 		let mut hasher = Sha256::new();
 		hasher.input(pkis.as_bytes());
 		dig = hasher.result();
-		let pub_sign = secp.sign(&Message::from_slice(&dig).unwrap(),&secret_key);
+		let pub_sign = self.secp.sign(&Message::from_slice(&dig).unwrap(),&secret_key);
 
 		Identity::new(ih,pk,&id_sign.to_string(),&pub_sign.to_string())
 	}
