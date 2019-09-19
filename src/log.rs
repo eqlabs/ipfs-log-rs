@@ -12,6 +12,7 @@ use crate::identity::Identity;
 use crate::identity::IdAndKey;
 use crate::lamport_clock::LamportClock;
 
+/// An immutable, operation-based conflict-free replicated data structure (CRDT).
 pub struct Log {
 	id: String,
 	identity: Identity,
@@ -79,6 +80,10 @@ impl<'a> Default for LogOptions<'a> {
 }
 
 impl Log {
+	/// Constructs a new log owned by `identity`, using `opts` for constructor options.
+	/// Use [`LogOptions::new()`] as `opts` for default constructor options.
+	///
+	/// [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
 	pub fn new (identity: Identity, opts: LogOptions) -> Log {
 		let (id, access, entries, heads, clock, fn_sort) =
 		(opts.id, opts.access, opts.entries, opts.heads, opts.clock, opts.fn_sort);
@@ -130,6 +135,134 @@ impl Log {
 			fn_sort: fn_sort,
 			clock: clock,
 		}
+	}
+
+	/// Appends `data` into the log as a new entry.
+	///
+	/// Returns a reference to the newly created, appended entry.
+	//Rc<Entry> instead of &Entry?
+	pub fn append (&mut self, data: &str, n_ptr: Option<usize>) -> &Entry {
+		let mut t_new = self.clock.time();
+		for h in &self.heads {
+			t_new = max(t_new,h.clock().time());
+		}
+		t_new = t_new + 1;
+		self.clock = LamportClock::new(self.clock.id()).set_time(t_new);
+
+		let mut heads = Vec::new();
+		for h in &self.heads {
+			heads.push(h.clone());
+		}
+		let mut refs = self.traverse(&heads[..],Some(max(n_ptr.unwrap_or(1),self.heads.len())),None);
+		self.heads.reverse();
+		self.heads = Log::dedup(&self.heads);
+		self.heads.append(&mut refs);
+
+		//should be created asynchronically in IPFS
+		let entry = Entry::new(self.identity.clone(),&self.id,data,
+		&self.heads.iter().map(|x| EntryOrHash::Hash(x.hash().to_owned())).collect::<Vec<_>>()[..],
+		Some(self.clock.clone()));
+		//should be queried asynchronically
+		if !self.access.can_access(&entry) {
+			panic!("Could not append entry, key \"{}\" is not allowed to write in the log",
+			self.identity.id());
+		}
+
+		let eh = entry.hash().to_owned();
+		let rc = Rc::new(entry);
+		self.entries.insert(eh.to_owned(),rc.clone());
+		for h in &self.heads {
+			self.nexts.insert(h.hash().to_owned());
+		}
+		self.heads.clear();
+		self.heads.push(rc);
+		self.length += 1;
+
+		&self.entries[&eh]
+	}
+
+	/// Joins the log `other` into this log. `other` is kept intact through and after the process.
+	///
+	/// Optionally truncates the log into `size` after joining.
+	//return type?
+	pub fn join (&mut self, other: &Log, size: Option<usize>) -> bool {
+		if self.id != other.id {
+			return false;
+		}
+		let new_items = other.diff(&self);
+
+		//something about identify provider and verification,
+		//implement later
+		//...
+		//...
+
+		for e in &new_items {
+			if let None = self.get(e.0) {
+				self.length += 1;
+			}
+			for n in e.1.next() {
+				self.nexts.insert(n.to_owned());
+			}
+		}
+
+		for e in &new_items {
+			self.entries.insert(e.0.to_owned(),e.1.clone());
+		}
+
+		let mut nexts_from_new_items = HashSet::new();
+		new_items.into_iter().map(|x| x.1.next().to_owned()).for_each(|n| n.iter().for_each(|n| {
+			nexts_from_new_items.insert(n.to_owned());
+		}));
+		let all_heads = Log::find_heads(&self.heads.iter().chain(other.heads.iter()).map(|x| x.clone()).collect::<Vec<_>>()[..]);
+		let merged_heads: Vec<Rc<Entry>> = all_heads.into_iter().filter(|x| !nexts_from_new_items.contains(&x.hash().to_owned())).
+		filter(|x| !self.nexts.contains(&x.hash().to_owned())).collect();
+		self.heads = Log::dedup(&merged_heads[..]);
+
+		if let Some(n) = size {
+			let mut vs = self.values();
+			vs.reverse();
+			vs = vs.into_iter().take(n).collect();
+
+			self.entries.clear();
+			for v in &vs {
+				self.entries.insert(v.hash().to_owned(),v.clone());
+			}
+
+			self.heads = Log::find_heads(&Log::dedup(&vs));
+			self.length = self.entries.len();
+		}
+
+		let mut t_max = 0;
+		for h in &self.heads {
+			t_max = max(t_max,h.clock().time());
+		}
+		self.clock = LamportClock::new(&self.id).set_time(t_max);
+
+		true
+	}
+
+	pub fn diff (&self, other: &Log) -> HashMap<String,Rc<Entry>> {
+		let mut stack: Vec<String> = self.heads.iter().map(|x| x.hash().to_owned()).collect();
+		let mut traversed = HashSet::<&str>::new();
+		let mut diff = HashMap::new();
+		while !stack.is_empty() {
+			let hash = stack.remove(0);
+			let a = self.get(&hash);
+			let b = other.get(&hash);
+			if a.is_some() && b.is_none()
+			&& a.unwrap().id() == other.id {
+				let a = a.unwrap();
+				for n in a.next() {
+					if !traversed.contains(&n[..]) && other.get(n).is_none() {
+						stack.push(n.to_owned());
+						traversed.insert(n);
+					}
+				}
+				traversed.insert(a.hash());
+				diff.insert(a.hash().to_owned(),a.clone());
+			}
+		}
+		diff
 	}
 
 	pub fn find_heads (entries: &[Rc<Entry>]) -> Vec<Rc<Entry>> {
@@ -316,126 +449,6 @@ impl Log {
 		}
 
 		result
-	}
-
-	pub fn append (&mut self, data: &str, n_ptr: Option<usize>) -> &Entry {
-		let mut t_new = self.clock.time();
-		for h in &self.heads {
-			t_new = max(t_new,h.clock().time());
-		}
-		t_new = t_new + 1;
-		self.clock = LamportClock::new(self.clock.id()).set_time(t_new);
-
-		let mut heads = Vec::new();
-		for h in &self.heads {
-			heads.push(h.clone());
-		}
-		let mut refs = self.traverse(&heads[..],Some(max(n_ptr.unwrap_or(1),self.heads.len())),None);
-		self.heads.reverse();
-		self.heads = Log::dedup(&self.heads);
-		self.heads.append(&mut refs);
-
-		//should be created asynchronically in IPFS
-		let entry = Entry::new(self.identity.clone(),&self.id,data,
-		&self.heads.iter().map(|x| EntryOrHash::Hash(x.hash().to_owned())).collect::<Vec<_>>()[..],
-		Some(self.clock.clone()));
-		//should be queried asynchronically
-		if !self.access.can_access(&entry) {
-			panic!("Could not append entry, key \"{}\" is not allowed to write in the log",
-			self.identity.id());
-		}
-
-		let eh = entry.hash().to_owned();
-		let rc = Rc::new(entry);
-		self.entries.insert(eh.to_owned(),rc.clone());
-		for h in &self.heads {
-			self.nexts.insert(h.hash().to_owned());
-		}
-		self.heads.clear();
-		self.heads.push(rc);
-		self.length += 1;
-
-		&self.entries[&eh]
-	}
-
-	pub fn join (&mut self, other: &Log, size: Option<usize>) -> bool {
-		if self.id != other.id {
-			return false;
-		}
-		let new_items = other.diff(&self);
-
-		//something about identify provider and verification,
-		//implement later
-		//...
-		//...
-
-		for e in &new_items {
-			if let None = self.get(e.0) {
-				self.length += 1;
-			}
-			for n in e.1.next() {
-				self.nexts.insert(n.to_owned());
-			}
-		}
-
-		for e in &new_items {
-			self.entries.insert(e.0.to_owned(),e.1.clone());
-		}
-
-		let mut nexts_from_new_items = HashSet::new();
-		new_items.into_iter().map(|x| x.1.next().to_owned()).for_each(|n| n.iter().for_each(|n| {
-			nexts_from_new_items.insert(n.to_owned());
-		}));
-		let all_heads = Log::find_heads(&self.heads.iter().chain(other.heads.iter()).map(|x| x.clone()).collect::<Vec<_>>()[..]);
-		let merged_heads: Vec<Rc<Entry>> = all_heads.into_iter().filter(|x| !nexts_from_new_items.contains(&x.hash().to_owned())).
-		filter(|x| !self.nexts.contains(&x.hash().to_owned())).collect();
-		self.heads = Log::dedup(&merged_heads[..]);
-
-		if let Some(n) = size {
-			let mut vs = self.values();
-			vs.reverse();
-			vs = vs.into_iter().take(n).collect();
-
-			self.entries.clear();
-			for v in &vs {
-				self.entries.insert(v.hash().to_owned(),v.clone());
-			}
-
-			self.heads = Log::find_heads(&Log::dedup(&vs));
-			self.length = self.entries.len();
-		}
-
-		let mut t_max = 0;
-		for h in &self.heads {
-			t_max = max(t_max,h.clock().time());
-		}
-		self.clock = LamportClock::new(&self.id).set_time(t_max);
-
-		true
-	}
-
-	pub fn diff (&self, other: &Log) -> HashMap<String,Rc<Entry>> {
-		let mut stack: Vec<String> = self.heads.iter().map(|x| x.hash().to_owned()).collect();
-		let mut traversed = HashSet::<&str>::new();
-		let mut diff = HashMap::new();
-		while !stack.is_empty() {
-			let hash = stack.remove(0);
-			let a = self.get(&hash);
-			let b = other.get(&hash);
-			if a.is_some() && b.is_none()
-			&& a.unwrap().id() == other.id {
-				let a = a.unwrap();
-				for n in a.next() {
-					if !traversed.contains(&n[..]) && other.get(n).is_none() {
-						stack.push(n.to_owned());
-						traversed.insert(n);
-					}
-				}
-				traversed.insert(a.hash());
-				diff.insert(a.hash().to_owned(),a.clone());
-			}
-		}
-		diff
 	}
 
 	pub fn json (&self) -> String {

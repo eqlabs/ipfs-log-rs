@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
-mod log;
-mod identity;
-mod lamport_clock;
-mod entry;
+pub mod log;
+pub mod identity;
+pub mod lamport_clock;
+pub mod entry;
 
 #[cfg(test)]
 mod tests {
