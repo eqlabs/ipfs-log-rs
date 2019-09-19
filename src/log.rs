@@ -184,10 +184,11 @@ impl Log {
 	/// Joins the log `other` into this log. `other` is kept intact through and after the process.
 	///
 	/// Optionally truncates the log into `size` after joining.
-	//return type?
-	pub fn join (&mut self, other: &Log, size: Option<usize>) -> bool {
+	///
+	/// Returns a reference to this log.
+	pub fn join (&mut self, other: &Log, size: Option<usize>) -> Option<&Log> {
 		if self.id != other.id {
-			return false;
+			return None;
 		}
 		let new_items = other.diff(&self);
 
@@ -238,9 +239,10 @@ impl Log {
 		}
 		self.clock = LamportClock::new(&self.id).set_time(t_max);
 
-		true
+		Some(self)
 	}
 
+	/// Returns a map of all the entries contained in this log but not in `other`.
 	pub fn diff (&self, other: &Log) -> HashMap<String,Rc<Entry>> {
 		let mut stack: Vec<String> = self.heads.iter().map(|x| x.hash().to_owned()).collect();
 		let mut traversed = HashSet::<&str>::new();
@@ -263,6 +265,27 @@ impl Log {
 			}
 		}
 		diff
+	}
+
+	/// Returns the id of the log.
+	pub fn id (&self) -> &str {
+		&self.id
+	}
+
+	/// Returns `true` if the log contains an entry with the hash `hash`.
+	/// Otherwise returns `false`.
+	pub fn has (&self, hash: &str) -> bool {
+		self.entries.contains_key(hash)
+	}
+
+	/// Returns a pointer to the entry with the hash `hash`.
+	pub fn get (&self, hash: &str) -> Option<&Rc<Entry>> {
+		self.entries.get(hash)
+	}
+
+	/// Returns the number of entries in the log.
+	pub fn len (&self) -> usize {
+		self.length
 	}
 
 	pub fn find_heads (entries: &[Rc<Entry>]) -> Vec<Rc<Entry>> {
@@ -335,10 +358,6 @@ impl Log {
 		v.iter().filter(|x| s.insert(x.hash())).map(|x| x.clone()).collect()
 	}
 
-	pub fn id (&self) -> &str {
-		&self.id
-	}
-
 	pub fn set_identity (&mut self, identity: Identity) {
 		let mut t_max = 0;
 		for h in &self.heads {
@@ -350,18 +369,6 @@ impl Log {
 
 	pub fn clock (&self) -> &LamportClock {
 		&self.clock
-	}
-
-	pub fn has (&self, hash: &str) -> bool {
-		self.entries.contains_key(hash)
-	}
-
-	pub fn len (&self) -> usize {
-		self.length
-	}
-
-	pub fn get (&self, hash: &str) -> Option<&Rc<Entry>> {
-		self.entries.get(hash)
 	}
 
 	pub fn values (&self) -> Vec<Rc<Entry>> {
