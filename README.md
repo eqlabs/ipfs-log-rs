@@ -1,8 +1,8 @@
-# ipfs_log_rs
+# ipfs-log-rs
 
 > A Rust implementation of [ipfs-log](https://github.com/orbitdb/ipfs-log) by Haja Networks: an append-only log on IPFS.
 
-`ipfs_log_rs` is an immutable conflict-free replicated data structure ([CRDT](https://en.wikipedia.org/wiki/CRDT)) for distributed systems. It is an append-only log that can be used to model a mutable, shared state between peers in peer-to-peer applications.
+`ipfs-log-rs` is an immutable conflict-free replicated data structure ([CRDT](https://en.wikipedia.org/wiki/CRDT)) for distributed systems. It is an append-only log that can be used to model a mutable, shared state between peers in peer-to-peer applications.
 
 Every entry in the log is stored in [IPFS](https://ipfs.io), and each points to a hash/hashes of the previous entry/entries, forming a graph. Logs can be forked and joined back together.
 

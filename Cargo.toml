@@ -1,5 +1,5 @@
 [package]
-name = "ipfs_log_rs"
+name = "ipfs-log-rs"
 version = "0.1.0"
 authors = ["Frans Saukko <frans@equilibrium.co>"]
 edition = "2018"
