@@ -140,7 +140,6 @@ impl Log {
 	/// Appends `data` into the log as a new entry.
 	///
 	/// Returns a reference to the newly created, appended entry.
-	//Rc<Entry> instead of &Entry?
 	pub fn append (&mut self, data: &str, n_ptr: Option<usize>) -> &Entry {
 		let mut t_new = self.clock.time();
 		for h in &self.heads {

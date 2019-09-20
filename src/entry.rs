@@ -14,7 +14,6 @@ pub enum EntryOrHash<'a> {
 /// and pointers to its parents.
 ///
 /// [`IPFS`]: https://ipfs.io
-// next: Vec<Rc<Entry>> instead of Vec<String>?
 #[derive(Clone,Debug,Serialize)]
 pub struct Entry {
 	hash: String,
@@ -96,8 +95,7 @@ impl Entry {
 	/// The length of the returned slice is either:
 	/// * 0 &mdash; no parents
 	/// * 2 &mdash; two identical strings for one parent, two distinct strings for two different parents
-	//&[String] instead of &Vec<String>?
-	pub fn next (&self) -> &Vec<String> {
+	pub fn next (&self) -> &[String] {
 		&self.next
 	}
 
