@@ -11,7 +11,9 @@ use crate::entry::EntryOrHash;
 use crate::identity::Identity;
 use crate::lamport_clock::LamportClock;
 
-/// An immutable, operation-based conflict-free replicated data structure (CRDT).
+/// An immutable, operation-based conflict-free replicated data type ([CRDT]).
+///
+/// [CRDT]: https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type
 pub struct Log {
 	id: String,
 	identity: Identity,
@@ -24,6 +26,22 @@ pub struct Log {
 	clock: LamportClock,
 }
 
+/// Options for constructing [`Log`].
+///
+/// Constructing log options using `LogOptions::new()` creates default log options:
+/// * no identifier,
+/// * no entries (and no heads among those non-existent entries),
+/// * no Lamport clock,
+/// * no sorting algorithm.
+///
+/// Use method chaining to set additional parameters:
+///
+/// ```ignore
+/// let opts = LogOptions::new().id("some_id").clock(LamportClock::new().set_time(128));
+/// let log = Log::new(/* identity */,opts);
+/// ```
+///
+/// [`Log`]: ./struct.Log.html
 pub struct LogOptions<'a> {
 	id: Option<&'a str>,
 	access: AdHocAccess,
@@ -34,30 +52,46 @@ pub struct LogOptions<'a> {
 }
 
 impl<'a> LogOptions<'a> {
+	/// Constructs default log options.
 	pub fn new () -> LogOptions<'a> {
 		LogOptions::default()
 	}
 
+	/// Sets the identifier for the constructed log options.
+	///
+	/// Allows method chaining.
 	pub fn id (mut self, id: &'a str) -> LogOptions {
 		self.id = Some(id);
 		self
 	}
 
+	/// Sets the entries for the constructed log options.
+	///
+	/// Allows method chaining.
 	pub fn entries (mut self, es: &'a[Rc<Entry>]) -> LogOptions {
 		self.entries = es;
 		self
 	}
 
+	/// Sets the heads for the constructed log options.
+	///
+	/// Allows method chaining.
 	pub fn heads (mut self, hs: &'a[Rc<Entry>]) -> LogOptions {
 		self.heads = hs;
 		self
 	}
 
+	/// Sets the Lamport clock for the constructed log options.
+	///
+	/// Allows method chaining.
 	pub fn clock (mut self, clock: LamportClock) -> LogOptions<'a> {
 		self.clock = Some(clock);
 		self
 	}
 
+	/// Sets the sorting algorithm for the constructed log options.
+	///
+	/// Allows method chaining.
 	pub fn fn_sort<F> (mut self, fn_sort: F) -> LogOptions<'a>
 	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
 		self.fn_sort = Some(Box::new(fn_sort));
@@ -551,6 +585,7 @@ impl Display for Log {
 	}
 }
 
+#[doc(hidden)]
 #[derive(Copy,Clone)]
 pub struct AdHocAccess;
 

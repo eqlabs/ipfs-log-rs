@@ -11,7 +11,7 @@ pub struct LamportClock {
 }
 
 impl LamportClock {
-	/// Creates a new Lamport clock with the given identifier.
+	/// Constructs a new Lamport clock with the given identifier.
 	pub fn new (id: &str) -> LamportClock {
 		LamportClock {
 			id: id.to_owned(),
@@ -19,9 +19,8 @@ impl LamportClock {
 		}
 	}
 
-	/// Sets the time of the (newly created) Lamport clock.
+	/// Sets the time of the (newly constructed) Lamport clock.
 	///
-	/// # Example
 	/// ```ignore
 	/// let clock = LamportClock::new("some_id").set_time(128);
 	/// ```
@@ -45,10 +44,8 @@ impl LamportClock {
 		self.time += 1;
 	}
 
-	/// Merges `o` to `self`.
-	///
-	/// # Behavior
-	/// * if `self.time < o.time`, set `self.time = o.time`;
+	/// Merges `o` to `self` in the following manner:
+	/// * if `self.time < o.time`, set `self.time = o.time`,
 	/// otherwise do nothing
 	/// * `o` is never modified
 	pub fn merge (&mut self, o: &LamportClock) {
