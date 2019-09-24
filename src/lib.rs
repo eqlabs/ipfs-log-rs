@@ -16,24 +16,24 @@ mod tests {
 
 	use super::lamport_clock::LamportClock;
 	use super::identity::Identity;
-	use super::identity::OrbitDbIdentificator;
+	use super::identity::Signatures;
+	use super::identity::DefaultIdentificator;
 	use super::identity::Identificator;
-	use super::identity::IdAndKey;
 	use super::log::Log;
 	use super::log::LogOptions;
 	use super::entry::Entry;
 	use super::entry::EntryOrHash;
 
 	fn identity1 () -> Identity {
-		Identity::new("userA","public","id_signature","public_signature")
+		Identity::new("userA","public",Signatures::new("id_signature","public_signature"))
 	}
 
 	fn identity2 () -> Identity {
-		Identity::new("userB","public","id_signature","public_signature")
+		Identity::new("userB","public",Signatures::new("id_signature","public_signature"))
 	}
 
 	fn identity3 () -> Identity {
-		Identity::new("userC","public","id_signature","public_signature")
+		Identity::new("userC","public",Signatures::new("id_signature","public_signature"))
 	}
 
 	#[test]
@@ -182,7 +182,7 @@ mod tests {
 	#[test]
 	#[ignore]
 	fn log_join () {
-		let id = Identity::new("0","1","2","3");
+		let id = Identity::new("0","1",Signatures::new("2","3"));
 		let log_id = "xyz";
 		let mut x = Log::new(id.clone(),LogOptions::new().id(log_id));
 		x.append("to",None);
@@ -241,7 +241,7 @@ mod tests {
 
 	#[test]
 	fn identities () {
-		let mut idpr = OrbitDbIdentificator::new();
+		let mut idpr = DefaultIdentificator::new();
 		let id = idpr.create("local_id");
 
 		let key = idpr.get("local_id").unwrap();

@@ -3,9 +3,8 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
-use crate::identity::IdAndKey;
 
-/// A wrapper to contain either a reference to an entry
+/// A wrapper containing either a reference to an entry
 /// or a hash as a string.
 pub enum EntryOrHash<'a> {
 	Entry(&'a Entry),

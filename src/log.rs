@@ -9,7 +9,6 @@ use serde_json::json;
 use crate::entry::Entry;
 use crate::entry::EntryOrHash;
 use crate::identity::Identity;
-use crate::identity::IdAndKey;
 use crate::lamport_clock::LamportClock;
 
 /// An immutable, operation-based conflict-free replicated data structure (CRDT).

@@ -22,7 +22,7 @@ impl LamportClock {
 	/// Sets the time of the (newly created) Lamport clock.
 	///
 	/// # Example
-	/// ```
+	/// ```ignore
 	/// let clock = LamportClock::new("some_id").set_time(128);
 	/// ```
 	pub fn set_time (mut self, time: u64) -> LamportClock {
@@ -48,8 +48,8 @@ impl LamportClock {
 	/// Merges `o` to `self`.
 	///
 	/// # Behavior
-	/// * if `self.time < o.time`, set `self.time = o.time`
-	/// otherwise do nothing,
+	/// * if `self.time < o.time`, set `self.time = o.time`;
+	/// otherwise do nothing
 	/// * `o` is never modified
 	pub fn merge (&mut self, o: &LamportClock) {
 		if self.time < o.time {
