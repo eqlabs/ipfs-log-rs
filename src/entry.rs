@@ -5,6 +5,8 @@ use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
 use crate::identity::IdAndKey;
 
+/// A wrapper to contain either a reference to an entry
+/// or a hash as a string.
 pub enum EntryOrHash<'a> {
 	Entry(&'a Entry),
 	Hash(String),
@@ -80,7 +82,7 @@ impl Entry {
 		&self.hash
 	}
 
-	/// Returns the id of the entry that is the same as of the containing log.
+	/// Returns the identifier of the entry that is the same as of the containing log.
 	pub fn id (&self) -> &str {
 		&self.id
 	}
@@ -109,7 +111,7 @@ impl Entry {
 		e2.next().iter().any(|x| x == e1.hash())
 	}
 
-	/// Returns a vector of pointers to all direct and indirect children of `entry`.
+	/// Returns a vector of pointers to all direct and indirect children of `entry` in `entries`.
 	pub fn find_children (entry: &Entry, entries: &[Rc<Entry>]) -> Vec<Rc<Entry>> {
 		let mut stack = Vec::new();
 		let mut parent = entries.iter().find(|e| Entry::is_parent(entry,e));

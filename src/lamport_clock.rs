@@ -1,6 +1,9 @@
 use serde::Serialize;
 use std::cmp::Ordering;
 
+/// A [Lamport clock] for partial chronological ordering of unconnected events.
+///
+/// [Lamport clock]: https://en.wikipedia.org/wiki/Lamport_clock
 #[derive(Clone,Debug,Serialize)]
 pub struct LamportClock {
 	id: String,
@@ -8,6 +11,7 @@ pub struct LamportClock {
 }
 
 impl LamportClock {
+	/// Creates a new Lamport clock with the given identifier.
 	pub fn new (id: &str) -> LamportClock {
 		LamportClock {
 			id: id.to_owned(),
@@ -15,23 +19,38 @@ impl LamportClock {
 		}
 	}
 
+	/// Sets the time of the (newly created) Lamport clock.
+	///
+	/// # Example
+	/// ```
+	/// let clock = LamportClock::new("some_id").set_time(128);
+	/// ```
 	pub fn set_time (mut self, time: u64) -> LamportClock {
 		self.time = time;
 		self
 	}
 
+	/// Returns the current time of the Lamport clock.
 	pub fn time (&self) -> u64 {
 		self.time
 	}
 
+	/// Returns the identifier of the Lamport clock.
 	pub fn id (&self) -> &str {
 		&self.id
 	}
 
+	/// Advances the time of the Lamport clock.
 	pub fn tick (&mut self) {
 		self.time += 1;
 	}
 
+	/// Merges `o` to `self`.
+	///
+	/// # Behavior
+	/// * if `self.time < o.time`, set `self.time = o.time`
+	/// otherwise do nothing,
+	/// * `o` is never modified
 	pub fn merge (&mut self, o: &LamportClock) {
 		if self.time < o.time {
 			self.time = o.time;

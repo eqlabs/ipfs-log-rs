@@ -81,6 +81,7 @@ impl<'a> Default for LogOptions<'a> {
 
 impl Log {
 	/// Constructs a new log owned by `identity`, using `opts` for constructor options.
+	///
 	/// Use [`LogOptions::new()`] as `opts` for default constructor options.
 	///
 	/// [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
@@ -266,7 +267,7 @@ impl Log {
 		diff
 	}
 
-	/// Returns the id of the log.
+	/// Returns the identifier of the log.
 	pub fn id (&self) -> &str {
 		&self.id
 	}
