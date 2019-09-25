@@ -122,6 +122,86 @@ impl Entry {
 		stack.sort_by(|a,b| a.clock().time().cmp(&b.clock().time()));
 		stack
 	}
+
+	/// A sorting function to pick the more recently written entry.
+	///
+	/// Uses [`sort_step_by_step`], resolving unsorted cases in the manner defined in it.
+	///
+	/// Returns an ordering.
+	///
+	/// [`sort_step_by_step`]: #method.sort_step_by_step
+	pub fn last_write_wins (a: &Entry, b: &Entry) -> Ordering {
+		Entry::sort_step_by_step(|_,_| Ordering::Less)(a,b)
+	}
+
+	/// A sorting function to pick the entry with the greater hash.
+	///
+	/// Uses [`sort_step_by_step`], resolving unsorted cases in the manner defined in it.
+	///
+	/// Returns an ordering.
+	///
+	/// [`sort_step_by_step`]: #method.sort_step_by_step
+	pub fn sort_by_entry_hash (a: &Entry, b: &Entry) -> Ordering {
+		Entry::sort_step_by_step(|a,b| a.hash().cmp(&b.hash()))(a,b)
+	}
+
+	/// A sorting helper function to
+	/// 1. first try to sort the two entries using `resolve`,
+	/// 2. if still unsorted (equal), try to sort based on the Lamport clock identifiers of the respective entries,
+	/// 3. sort by the Lamport clocks of the respective entries.
+	///
+	/// Returns a closure that can be used as a sorting function.
+	pub fn sort_step_by_step<F> (resolve: F) -> impl Fn(&Entry,&Entry) -> Ordering
+	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
+		Entry::sort_by_clocks(Entry::sort_by_clock_ids(resolve))
+	}
+
+	/// A sorting helper function to sort by the Lamport clocks of the respective entries.
+	/// In the case the Lamport clocks are equal, tries to sort using `resolve`.
+	///
+	/// Returns a closure that can be used as a sorting function.
+	pub fn sort_by_clocks<F> (resolve: F) -> impl Fn(&Entry,&Entry) -> Ordering
+	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
+		move |a,b| {
+			let mut diff = a.clock().cmp(&b.clock());
+			if diff == Ordering::Equal {
+				diff = resolve(a,b);
+			}
+			diff
+		}
+	}
+
+	/// A sorting helper function to sort by the Lamport clock identifiers of the respective entries.
+	/// In the case the Lamport clocks identifiers are equal, tries to sort using `resolve`.
+	///
+	/// Returns a closure that can be used as a sorting function.
+	pub fn sort_by_clock_ids<F> (resolve: F) -> impl Fn(&Entry,&Entry) -> Ordering
+	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
+		move |a,b| {
+			let mut diff = a.clock().id().cmp(&b.clock().id());
+			if diff == Ordering::Equal {
+				diff = resolve(a,b);
+			}
+			diff
+		}
+	}
+
+	/// A sorting helper function that forbids the sorting function `fn_sort` from
+	/// producing unsorted (equal) cases.
+	///
+	/// Returns a closure that behaves in the same way as `fn_sort`
+	/// but panics if the two entries given as input are equal.
+	pub fn no_zeroes<F> (fn_sort: F) -> impl Fn(&Entry,&Entry) -> Ordering
+	where F: 'static + Fn(&Entry,&Entry) -> Ordering {
+		move |a,b| {
+			let diff = fn_sort(a,b);
+			if diff == Ordering::Equal {
+				panic!("Your log's tiebreaker function {}",
+				"has returned zero and therefore cannot be");
+			}
+			diff
+		}
+	}
 }
 
 impl PartialEq for Entry {
