@@ -11,7 +11,7 @@ mod tests {
 	use std::io::Cursor;
 
 	use ipfs_api::IpfsClient;
-	use hyper::rt::Future;
+	use hyper::rt::{Future,run};
 	use serde_json::json;
 
 	use super::lamport_clock::LamportClock;
@@ -231,12 +231,22 @@ mod tests {
 	}
 
 	#[test]
-	#[ignore]
 	fn ipfs () {
 		let client = IpfsClient::default();
+
 		let data = Cursor::new("tinamämmi");
-		let request = client.add(data).map(|r| println!("ipfs/{}",r.hash)).map_err(|e| eprintln!("{}",e));
-		hyper::rt::run(request);
+		let request = client.add(data).map(|r| println!("put {}",r.hash)).map_err(|e| eprintln!("{}",e));
+		run(request);
+
+		let mut idpr = DefaultIdentificator::new();
+		let id = idpr.create("local_id");
+		let mut log = Log::new(id.clone(),LogOptions::new().id("log_id"));
+		log.append("first",None);
+		log.append("second",None);
+		log.append("third",None);
+		run(client.add(Cursor::new(log.snapshot())).map(|r| println!("put {}",r.hash)).map_err(|e| eprintln!("{}",e)));
+		run(client.object_get("QmQJxSCHs1e3NRSXZeHg86yhHWCTHd26Lx1HFsmqQHkF4R").map(|r| println!("get {}:\n{}","QmQJxSCHs1e3NRSXZeHg86yhHWCTHd26Lx1HFsmqQHkF4R",r.data)).map_err(|e| eprintln!("{}",e)));
+		run(client.object_get("QmekwsuyWM853FXJ5SzUW6eQG2LXjp6L8a7xSJf9ZWZW4U").map(|r| println!("get {}:\n{}","QmekwsuyWM853FXJ5SzUW6eQG2LXjp6L8a7xSJf9ZWZW4U",r.data)).map_err(|e| eprintln!("{}",e)));
 	}
 
 	#[test]
