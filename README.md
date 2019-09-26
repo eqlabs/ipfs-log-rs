@@ -49,8 +49,8 @@ Every entry in the log is stored in [IPFS](https://ipfs.io), and each points to 
 cargo test
 ```
 
-## Copyright
+## License
 
-&copy; 2016&ndash;2018 Protocol Labs Inc.,  
+[MIT](LICENSE) &copy; 2016&ndash;2018 Protocol Labs Inc.,  
 2016&ndash;2019 Haja Networks Oy,  
 2019 Equilibrium Labs.
