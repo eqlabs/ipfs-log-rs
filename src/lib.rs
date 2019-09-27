@@ -10,7 +10,7 @@ mod tests {
 	use std::rc::Rc;
 	use std::io::Cursor;
 
-	use ipfs_api::IpfsClient;
+	use ipfs_api::{IpfsClient,ObjectTemplate};
 	use hyper::rt::{Future,run};
 	use serde_json::json;
 
@@ -247,6 +247,9 @@ mod tests {
 		run(client.add(Cursor::new(log.snapshot())).map(|r| println!("put {}",r.hash)).map_err(|e| eprintln!("{}",e)));
 		run(client.object_get("QmQJxSCHs1e3NRSXZeHg86yhHWCTHd26Lx1HFsmqQHkF4R").map(|r| println!("get {}:\n{}","QmQJxSCHs1e3NRSXZeHg86yhHWCTHd26Lx1HFsmqQHkF4R",r.data)).map_err(|e| eprintln!("{}",e)));
 		run(client.object_get("QmekwsuyWM853FXJ5SzUW6eQG2LXjp6L8a7xSJf9ZWZW4U").map(|r| println!("get {}:\n{}","QmekwsuyWM853FXJ5SzUW6eQG2LXjp6L8a7xSJf9ZWZW4U",r.data)).map_err(|e| eprintln!("{}",e)));
+
+		let request = client.object_new(Some(ObjectTemplate::UnixFsDir)).map(|r| println!("object: {}",r.hash)).map_err(|e| eprintln!("error: {}",e));
+		run(request);
 	}
 
 	#[test]
