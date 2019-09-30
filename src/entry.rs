@@ -1,6 +1,12 @@
 use std::cmp::Ordering;
 use std::rc::Rc;
+use serde_json::json;
 use serde::Serialize;
+
+use std::io::Cursor;
+use hyper::rt::{Future,run};
+use ipfs_api::IpfsClient;
+
 use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
 
@@ -59,6 +65,21 @@ impl Entry {
 		}
 	}
 
+	//ad hoc
+	pub fn multihash (ipfs: &IpfsClient, entry: &Entry) -> String {
+		let e = json!({
+			"hash": "null",
+			"id": entry.id,
+			"payload": entry.payload,
+			"next": entry.next,
+			"v": entry.v,
+			"clock": entry.clock,
+		}).to_string();
+		let c = Cursor::new(e);
+		run(ipfs.add(c).map(|x| println!("{}",x.hash)).map_err(|e| println!("{}",e)));
+		String::new()
+	}
+
 	/// Locally creates an entry owned by `identity` .
 	///
 	///  The created entry is part of the [log] with the id `log_id`,
@@ -71,9 +92,11 @@ impl Entry {
 	/// [log]: ../log/struct.Log.html
 	/// [Lamport clock]: ../lamport_clock/struct.LamportClock.html
 	/// [reference-counting pointer]: https://doc.rust-lang.org/std/rc/struct.Rc.html
-	pub fn create (identity: Identity, log_id: &str, data: &str,
+	pub fn create (ipfs: &IpfsClient, identity: Identity, log_id: &str, data: &str,
 	nexts: &[EntryOrHash], clock: Option<LamportClock>) -> Rc<Entry> {
-		Rc::new(Entry::new(identity,log_id,data,nexts,clock))
+		let mut e = Entry::new(identity,log_id,data,nexts,clock);
+		e.hash = Entry::multihash(ipfs,&e);
+		Rc::new(e)
 	}
 
 	/// Returns the hash of the entry.

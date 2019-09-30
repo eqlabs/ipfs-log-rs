@@ -24,6 +24,10 @@ mod tests {
 	use super::entry::Entry;
 	use super::entry::EntryOrHash;
 
+	fn ipfs () -> IpfsClient {
+		IpfsClient::default()
+	}
+
 	fn identity1 () -> Identity {
 		Identity::new("userA","public",Signatures::new("id_signature","public_signature"))
 	}
@@ -51,10 +55,11 @@ mod tests {
 
 	#[test]
 	fn set_items () {
+		let ipfs = ipfs();
 		let id = identity1();
-		let e1 = Entry::create(id.clone(),"A","entryA",&[],Some(LamportClock::new("A")));
-		let e2 = Entry::create(id.clone(),"A","entryB",&[],Some(LamportClock::new("B")));
-		let e3 = Entry::create(id.clone(),"A","entryC",&[],Some(LamportClock::new("C")));
+		let e1 = Entry::create(&ipfs,id.clone(),"A","entryA",&[],Some(LamportClock::new("A")));
+		let e2 = Entry::create(&ipfs,id.clone(),"A","entryB",&[],Some(LamportClock::new("B")));
+		let e3 = Entry::create(&ipfs,id.clone(),"A","entryC",&[],Some(LamportClock::new("C")));
 		let log = Log::new(id,LogOptions::new().id("A").entries(&[e1,e2,e3]));
 		assert_eq!(log.len(),3);
 		assert_eq!(log.values()[0].payload(),"entryA");
@@ -64,10 +69,11 @@ mod tests {
 
 	#[test]
 	fn set_heads () {
+		let ipfs = ipfs();
 		let id = identity1();
-		let e1 = Entry::create(id.clone(),"A","entryA",&[],None);
-		let e2 = Entry::create(id.clone(),"A","entryB",&[],None);
-		let e3 = Entry::create(id.clone(),"A","entryC",&[],None);
+		let e1 = Entry::create(&ipfs,id.clone(),"A","entryA",&[],None);
+		let e2 = Entry::create(&ipfs,id.clone(),"A","entryB",&[],None);
+		let e3 = Entry::create(&ipfs,id.clone(),"A","entryC",&[],None);
 		let log = Log::new(id,LogOptions::new().id("B").entries(&[e1,e2,e3.clone()]).heads(&[e3.clone()]));
 		assert_eq!(log.heads().len(),1);
 		assert_eq!(log.heads()[0].hash(),e3.hash());
@@ -75,10 +81,11 @@ mod tests {
 
 	#[test]
 	fn find_heads () {
+		let ipfs = ipfs();
 		let id = identity1();
-		let e1 = Entry::create(id.clone(),"A","entryA",&[],None);
-		let e2 = Entry::create(id.clone(),"A","entryB",&[],None);
-		let e3 = Entry::create(id.clone(),"A","entryC",&[],None);
+		let e1 = Entry::create(&ipfs,id.clone(),"A","entryA",&[],None);
+		let e2 = Entry::create(&ipfs,id.clone(),"A","entryB",&[],None);
+		let e3 = Entry::create(&ipfs,id.clone(),"A","entryC",&[],None);
 		let log = Log::new(id,LogOptions::new().id("A").entries(&[e1.clone(),e2.clone(),e3.clone()]));
 		assert_eq!(log.heads().len(),3);
 		assert_eq!(log.heads()[2].hash(),e1.hash());
@@ -230,10 +237,12 @@ mod tests {
 		println!("----\t\tx\t\t----\n{}",x.entries());
 	}
 
+	/*
 	#[test]
 	fn ipfs () {
 		let client = IpfsClient::default();
 
+		/*
 		let data = Cursor::new("tinamämmi");
 		let request = client.add(data).map(|r| println!("put {}",r.hash)).map_err(|e| eprintln!("{}",e));
 		run(request);
@@ -246,11 +255,12 @@ mod tests {
 		log.append("third",None);
 		run(client.add(Cursor::new(log.snapshot())).map(|r| println!("put {}",r.hash)).map_err(|e| eprintln!("{}",e)));
 		run(client.object_get("QmQJxSCHs1e3NRSXZeHg86yhHWCTHd26Lx1HFsmqQHkF4R").map(|r| println!("get {}:\n{}","QmQJxSCHs1e3NRSXZeHg86yhHWCTHd26Lx1HFsmqQHkF4R",r.data)).map_err(|e| eprintln!("{}",e)));
-		run(client.object_get("QmekwsuyWM853FXJ5SzUW6eQG2LXjp6L8a7xSJf9ZWZW4U").map(|r| println!("get {}:\n{}","QmekwsuyWM853FXJ5SzUW6eQG2LXjp6L8a7xSJf9ZWZW4U",r.data)).map_err(|e| eprintln!("{}",e)));
+		run(client.object_get("QmekwsuyWM853FXJ5SzUW6eQG2LXjp6L8a7xSJf9ZWZW4U").map(|r| println!("get {}:\n{}","QmekwsuyWM853FXJ5SzUW6eQG2LXjp6L8a7xSJf9ZWZW4U",r.data)).map_err(|e| eprintln!("{}",e)));*/
 
+		/*
 		let request = client.object_new(Some(ObjectTemplate::UnixFsDir)).map(|r| println!("object: {}",r.hash)).map_err(|e| eprintln!("error: {}",e));
-		run(request);
-	}
+		run(request);*/
+	}*/
 
 	#[test]
 	fn identities () {
