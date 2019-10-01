@@ -1,10 +1,10 @@
-use serde::Serialize;
+use serde::{Serialize,Deserialize};
 use std::cmp::Ordering;
 
 /// A [Lamport clock] for partial chronological ordering of unconnected events.
 ///
 /// [Lamport clock]: https://en.wikipedia.org/wiki/Lamport_clock
-#[derive(Clone,Debug,Serialize)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct LamportClock {
 	id: String,
 	time: u64,

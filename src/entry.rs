@@ -1,10 +1,10 @@
 use std::cmp::Ordering;
 use std::rc::Rc;
 use serde_json::json;
-use serde::Serialize;
+use serde::{Serialize,Deserialize};
 
 use std::io::Cursor;
-use futures::future::Future;
+use futures::{future::Future,stream::Stream};
 use tokio::runtime::Runtime;
 use ipfs_api::{IpfsClient,response::Error};
 
@@ -22,7 +22,7 @@ pub enum EntryOrHash<'a> {
 /// and pointers to its parents.
 ///
 /// [`IPFS`]: https://ipfs.io
-#[derive(Clone,Debug,Serialize)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct Entry {
 	hash: String,
 	id: String,
@@ -66,20 +66,6 @@ impl Entry {
 		}
 	}
 
-	//ad hoc
-	pub fn multihash (ipfs: &IpfsClient, entry: &Entry) -> impl Future<Item = String,Error = Error> + Send {
-		let e = json!({
-			"id": entry.id,
-			"payload": entry.payload,
-			"next": entry.next,
-			"v": entry.v,
-			"clock": entry.clock,
-		}).to_string();
-		ipfs.add(Cursor::new(e)).map(|x| x.hash).map_err(|e| e)
-	}
-
-	//pub fn from_multihash (ipfs: &IpfsClient, hash: &str) -> Entry
-
 	/// Locally creates an entry owned by `identity` .
 	///
 	///  The created entry is part of the [log] with the id `log_id`,
@@ -97,6 +83,33 @@ impl Entry {
 		let mut e = Entry::new(identity,log_id,data,nexts,clock);
 		e.hash = Runtime::new().unwrap().block_on(Entry::multihash(ipfs,&e)).unwrap();
 		Rc::new(e)
+	}
+
+	/// Stores `entry` in the IPFS client `ipfs` and returns a future containing its multihash.
+	///
+	/// **N.B.** *At the moment stores the entry as JSON, not CBOR DAG.*
+	pub fn multihash (ipfs: &IpfsClient, entry: &Entry) -> impl Future<Item = String,Error = Error> + Send {
+		let e = json!({
+			"hash": "null",
+			"id": entry.id,
+			"payload": entry.payload,
+			"next": entry.next,
+			"v": entry.v,
+			"clock": entry.clock,
+		}).to_string();
+		ipfs.add(Cursor::new(e)).map(|x| x.hash)
+	}
+
+	/// Returns the future containing the entry stored in the IPFS client `ipfs` with the multihash `hash`.
+	///
+	/// **N.B.** *At the moment converts the entry from JSON, not CBOR DAG.*
+	pub fn from_multihash (ipfs: &IpfsClient, hash: &str) -> impl Future<Item = Entry,Error = Error> + Send {
+		let h = hash.to_owned();
+		ipfs.cat(hash).concat2().map(|x| {
+			let mut e: Entry = serde_json::from_str(std::str::from_utf8(&x).unwrap()).unwrap();
+			e.hash = h;
+			e
+		})
 	}
 
 	/// Returns the hash of the entry.
