@@ -4,8 +4,9 @@ use serde_json::json;
 use serde::Serialize;
 
 use std::io::Cursor;
-use hyper::rt::{Future,run};
-use ipfs_api::IpfsClient;
+use futures::future::Future;
+use tokio::runtime::Runtime;
+use ipfs_api::{IpfsClient,response::Error};
 
 use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
@@ -66,19 +67,18 @@ impl Entry {
 	}
 
 	//ad hoc
-	pub fn multihash (ipfs: &IpfsClient, entry: &Entry) -> String {
+	pub fn multihash (ipfs: &IpfsClient, entry: &Entry) -> impl Future<Item = String,Error = Error> + Send {
 		let e = json!({
-			"hash": "null",
 			"id": entry.id,
 			"payload": entry.payload,
 			"next": entry.next,
 			"v": entry.v,
 			"clock": entry.clock,
 		}).to_string();
-		let c = Cursor::new(e);
-		run(ipfs.add(c).map(|x| println!("{}",x.hash)).map_err(|e| println!("{}",e)));
-		String::new()
+		ipfs.add(Cursor::new(e)).map(|x| x.hash).map_err(|e| e)
 	}
+
+	//pub fn from_multihash (ipfs: &IpfsClient, hash: &str) -> Entry
 
 	/// Locally creates an entry owned by `identity` .
 	///
@@ -95,7 +95,7 @@ impl Entry {
 	pub fn create (ipfs: &IpfsClient, identity: Identity, log_id: &str, data: &str,
 	nexts: &[EntryOrHash], clock: Option<LamportClock>) -> Rc<Entry> {
 		let mut e = Entry::new(identity,log_id,data,nexts,clock);
-		e.hash = Entry::multihash(ipfs,&e);
+		e.hash = Runtime::new().unwrap().block_on(Entry::multihash(ipfs,&e)).unwrap();
 		Rc::new(e)
 	}
 

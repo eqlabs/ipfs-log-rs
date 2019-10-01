@@ -8,10 +8,8 @@ pub mod entry;
 #[cfg(test)]
 mod tests {
 	use std::rc::Rc;
-	use std::io::Cursor;
 
-	use ipfs_api::{IpfsClient,ObjectTemplate};
-	use hyper::rt::{Future,run};
+	use ipfs_api::IpfsClient;
 	use serde_json::json;
 
 	use super::lamport_clock::LamportClock;
