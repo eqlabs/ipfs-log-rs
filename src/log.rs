@@ -5,6 +5,7 @@ use std::cmp::max;
 use std::time::SystemTime;
 use std::rc::Rc;
 use std::fmt::{Display,Formatter,Result};
+use ipfs_api::IpfsClient;
 use serde_json::json;
 use crate::entry::Entry;
 use crate::entry::EntryOrHash;
@@ -15,6 +16,7 @@ use crate::lamport_clock::LamportClock;
 ///
 /// [CRDT]: https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type
 pub struct Log {
+	ipfs: Rc<IpfsClient>,
 	id: String,
 	identity: Identity,
 	access: AdHocAccess,
@@ -118,7 +120,7 @@ impl Log {
 	/// Use [`LogOptions::new()`] as `opts` for default constructor options.
 	///
 	/// [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
-	pub fn new (identity: Identity, opts: LogOptions) -> Log {
+	pub fn new (ipfs: Rc<IpfsClient>, identity: Identity, opts: LogOptions) -> Log {
 		let (id, access, entries, heads, clock, fn_sort) =
 		(opts.id, opts.access, opts.entries, opts.heads, opts.clock, opts.fn_sort);
 		let fn_sort = Box::new(Entry::no_zeroes(fn_sort.unwrap_or(Box::new(Entry::last_write_wins))));
@@ -159,6 +161,7 @@ impl Log {
 		let clock = LamportClock::new(identity.pub_key()).set_time(t_max);
 
 		Log {
+			ipfs: ipfs.clone(),
 			id: id,
 			identity: identity,
 			access: access,

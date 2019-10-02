@@ -22,8 +22,8 @@ mod tests {
 	use super::entry::Entry;
 	use super::entry::EntryOrHash;
 
-	fn ipfs () -> IpfsClient {
-		IpfsClient::default()
+	fn ipfs () -> Rc<IpfsClient> {
+		Rc::new(IpfsClient::default())
 	}
 
 	fn identity1 () -> Identity {
@@ -40,14 +40,14 @@ mod tests {
 
 	#[test]
 	fn set_id () {
-		let log = Log::new(identity1(),LogOptions::new().id("ABC"));
+		let log = Log::new(ipfs(),identity1(),LogOptions::new().id("ABC"));
 		assert_eq!(log.id(),"ABC");
 	}
 
 	#[test]
 	fn set_clock_id () {
 		let id = identity1();
-		let log = Log::new(id.clone(),LogOptions::new().id("ABC"));
+		let log = Log::new(ipfs(),id.clone(),LogOptions::new().id("ABC"));
 		assert_eq!(log.clock().id(),id.pub_key());
 	}
 
@@ -58,7 +58,7 @@ mod tests {
 		let e1 = Entry::create(&ipfs,id.clone(),"A","entryA",&[],Some(LamportClock::new("A")));
 		let e2 = Entry::create(&ipfs,id.clone(),"A","entryB",&[],Some(LamportClock::new("B")));
 		let e3 = Entry::create(&ipfs,id.clone(),"A","entryC",&[],Some(LamportClock::new("C")));
-		let log = Log::new(id,LogOptions::new().id("A").entries(&[e1,e2,e3]));
+		let log = Log::new(ipfs,id,LogOptions::new().id("A").entries(&[e1,e2,e3]));
 		assert_eq!(log.len(),3);
 		assert_eq!(log.values()[0].payload(),"entryA");
 		assert_eq!(log.values()[1].payload(),"entryB");
@@ -72,7 +72,7 @@ mod tests {
 		let e1 = Entry::create(&ipfs,id.clone(),"A","entryA",&[],None);
 		let e2 = Entry::create(&ipfs,id.clone(),"A","entryB",&[],None);
 		let e3 = Entry::create(&ipfs,id.clone(),"A","entryC",&[],None);
-		let log = Log::new(id,LogOptions::new().id("B").entries(&[e1,e2,e3.clone()]).heads(&[e3.clone()]));
+		let log = Log::new(ipfs,id,LogOptions::new().id("B").entries(&[e1,e2,e3.clone()]).heads(&[e3.clone()]));
 		assert_eq!(log.heads().len(),1);
 		assert_eq!(log.heads()[0].hash(),e3.hash());
 	}
@@ -84,7 +84,7 @@ mod tests {
 		let e1 = Entry::create(&ipfs,id.clone(),"A","entryA",&[],None);
 		let e2 = Entry::create(&ipfs,id.clone(),"A","entryB",&[],None);
 		let e3 = Entry::create(&ipfs,id.clone(),"A","entryC",&[],None);
-		let log = Log::new(id,LogOptions::new().id("A").entries(&[e1.clone(),e2.clone(),e3.clone()]));
+		let log = Log::new(ipfs,id,LogOptions::new().id("A").entries(&[e1.clone(),e2.clone(),e3.clone()]));
 		assert_eq!(log.heads().len(),3);
 		assert_eq!(log.heads()[2].hash(),e1.hash());
 		assert_eq!(log.heads()[1].hash(),e2.hash());
@@ -94,7 +94,7 @@ mod tests {
 	#[test]
 	fn to_string () {
 		let expected = "five\n└─four\n  └─three\n    └─two\n      └─one\n";
-		let mut log = Log::new(identity1(),LogOptions::new().id("A"));
+		let mut log = Log::new(ipfs(),identity1(),LogOptions::new().id("A"));
 		log.append("one",None);
 		log.append("two",None);
 		log.append("three",None);
@@ -106,7 +106,7 @@ mod tests {
 	//fix comparison after implementing genuine hashing
 	#[test]
 	fn get () {
-		let mut log = Log::new(identity1(),LogOptions::new().id("AAA"));
+		let mut log = Log::new(ipfs(),identity1(),LogOptions::new().id("AAA"));
 		log.append("one",None);
 		assert_eq!(log.get(log.values()[0].hash()).unwrap().hash(),"one");
 		assert_eq!(log.get("zero"),None);
@@ -115,7 +115,7 @@ mod tests {
 	#[test]
 	fn set_identity () {
 		let id1 = identity1();
-		let mut log = Log::new(id1.clone(),LogOptions::new().id("AAA"));
+		let mut log = Log::new(ipfs(),id1.clone(),LogOptions::new().id("AAA"));
 		log.append("one",None);
 		assert_eq!(log.values()[0].clock().id(),id1.pub_key());
 		assert_eq!(log.values()[0].clock().time(),1);
@@ -142,7 +142,7 @@ mod tests {
 			"id": "AAA",
 			"heads": ["three"],
 		}).to_string();
-		let mut log = Log::new(identity1(),LogOptions::new().id("AAA"));
+		let mut log = Log::new(ipfs(),identity1(),LogOptions::new().id("AAA"));
 		log.append("one",None);
 		log.append("two",None);
 		log.append("three",None);
@@ -152,7 +152,7 @@ mod tests {
 
 	#[test]
 	fn values () {
-		let mut log = Log::new(identity1(),LogOptions::new());
+		let mut log = Log::new(ipfs(),identity1(),LogOptions::new());
 		assert_eq!(log.len(),0);
 		log.append("hello1",None);
 		log.append("hello2",None);
@@ -189,7 +189,7 @@ mod tests {
 	fn log_join () {
 		let id = Identity::new("0","1",Signatures::new("2","3"));
 		let log_id = "xyz";
-		let mut x = Log::new(id.clone(),LogOptions::new().id(log_id));
+		let mut x = Log::new(ipfs(),id.clone(),LogOptions::new().id(log_id));
 		x.append("to",None);
 		x.append("set",None);
 		x.append("your",None);
@@ -199,11 +199,11 @@ mod tests {
 		let e3 = Entry::new(id.clone(),log_id,"third",&[],None);
 		let e1 = Entry::new(id.clone(),log_id,"first",&[EntryOrHash::Entry(&e2),EntryOrHash::Entry(&e3)],None);
 		let es = &[Rc::new(e1),Rc::new(e2),Rc::new(e3)];
-		let mut y = Log::new(id.clone(),LogOptions::new().id(log_id).entries(es));
+		let mut y = Log::new(ipfs(),id.clone(),LogOptions::new().id(log_id).entries(es));
 		y.append("fifth",None);
 		y.append("seventh",None);
 
-		let mut z = Log::new(id.clone(),LogOptions::new().id(log_id).entries(es));
+		let mut z = Log::new(ipfs(),id.clone(),LogOptions::new().id(log_id).entries(es));
 		z.append("fourth",None);
 		z.append("sixth",None);
 		z.append("eighth",None);
