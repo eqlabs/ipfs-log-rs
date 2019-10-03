@@ -35,9 +35,11 @@ Every entry in the log is stored in [IPFS](https://ipfs.io), and each points to 
 
 ## Status
 
-*Pre-alpha*: only local functionality, IPFS storing unimplemented as of yet.
-
-**Not valid for actual use at the moment.**
+*Basic functionality implemented (Oct 3, 2019)*
+* essential log and entry operations
+* testing lacking
+* documentation lacking to some extent
+* stores entries in IPFS **only as JSON** at the moment, not as CBOR DAGs
 
 ## Requirements
 
