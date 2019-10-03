@@ -5,6 +5,7 @@ use std::cmp::max;
 use std::time::SystemTime;
 use std::rc::Rc;
 use std::fmt::{Display,Formatter,Result};
+use tokio::runtime::Runtime;
 use ipfs_api::IpfsClient;
 use serde_json::json;
 use crate::entry::Entry;
@@ -174,6 +175,21 @@ impl Log {
 		}
 	}
 
+	/// Constructs a new log with the identity `identity` from an entry with the hash `hash`,
+	/// using `opts` for constructor options.
+	///
+	/// Use [`LogOptions::new()`] as `opts` for default constructor options.
+	///
+	/// **N.B.** [`opts.entries(/* entries */)`] *and* [`opts.heads(/* heads */)`] *have no effect in the log created.*
+	///
+	/// [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
+	/// [`opts.entries(/* entries */)`]: ./struct.LogOptions.html#method.entries
+	/// [`opts.heads(/* heads */)`]: ./struct.LogOptions.html#method.heads
+	pub fn from_multihash (ipfs: Rc<IpfsClient>, identity: Identity, opts: LogOptions, hash: &str) -> Log {
+		let es = Entry::fetch_entries(&ipfs,&[hash.to_owned()]).into_iter().map(|x| Rc::new(x)).collect::<Vec<Rc<Entry>>>();
+		Log::new(ipfs,identity,opts.entries(&es).heads(&[]))
+	}
+
 	/// Appends `data` into the log as a new entry.
 	///
 	/// Returns a reference to the newly created, appended entry.
@@ -195,9 +211,10 @@ impl Log {
 		self.heads.append(&mut refs);
 
 		//should be created asynchronically in IPFS
-		let entry = Entry::new(self.identity.clone(),&self.id,data,
+		let mut entry = Entry::new(self.identity.clone(),&self.id,data,
 		&self.heads.iter().map(|x| EntryOrHash::Hash(x.hash().to_owned())).collect::<Vec<_>>()[..],
 		Some(self.clock.clone()));
+		entry.set_hash(&Runtime::new().unwrap().block_on(Entry::multihash(&self.ipfs,&entry)).unwrap());
 		//should be queried asynchronically
 		if !self.access.can_access(&entry) {
 			panic!("Could not append entry, key \"{}\" is not allowed to write in the log",

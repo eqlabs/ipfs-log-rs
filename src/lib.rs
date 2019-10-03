@@ -108,7 +108,7 @@ mod tests {
 	fn get () {
 		let mut log = Log::new(ipfs(),identity1(),LogOptions::new().id("AAA"));
 		log.append("one",None);
-		assert_eq!(log.get(log.values()[0].hash()).unwrap().hash(),"one");
+		assert_eq!(log.get(log.values()[0].hash()).unwrap().hash(),"QmUMWpQmAqh4Uws3eSWkELeic1eHTnwzZq3p3VGt1D5Cy9");
 		assert_eq!(log.get("zero"),None);
 	}
 
@@ -140,14 +140,21 @@ mod tests {
 	fn serialize () {
 		let expected = json!({
 			"id": "AAA",
-			"heads": ["three"],
+			"heads": ["QmREuiyqTuJrcWr5BLrT9d9p8dcvdWvwc4JJMHpKcei4Em"],
 		}).to_string();
-		let mut log = Log::new(ipfs(),identity1(),LogOptions::new().id("AAA"));
+		let ipfs = ipfs();
+		let mut log = Log::new(ipfs.clone(),identity1(),LogOptions::new().id("AAA"));
 		log.append("one",None);
 		log.append("two",None);
 		log.append("three",None);
 		assert_eq!(log.json(),expected);
 		//...
+
+		//extra
+		let log2 = Log::from_multihash(ipfs.clone(),identity1(),LogOptions::new().id("AAA"),"QmREuiyqTuJrcWr5BLrT9d9p8dcvdWvwc4JJMHpKcei4Em");
+		assert_eq!(log.snapshot(),log2.snapshot());
+		let log3 = Log::from_multihash(ipfs,identity1(),LogOptions::new().id("AAA"),"QmQyM8vsbzs6ibi6DFRhXVFurR1AaFyJkPnnvQTeNEdbZu");
+		assert_ne!(log.snapshot(),log3.snapshot());
 	}
 
 	#[test]

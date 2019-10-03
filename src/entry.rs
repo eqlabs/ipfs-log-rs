@@ -1,10 +1,12 @@
 use std::cmp::Ordering;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use serde_json::json;
 use serde::{Serialize,Deserialize};
 
 use std::io::Cursor;
-use futures::{future::Future,stream::Stream};
+use futures::{future::{Future,join_all},stream::Stream};
 use tokio::runtime::Runtime;
 use ipfs_api::{IpfsClient,response::Error};
 
@@ -112,9 +114,42 @@ impl Entry {
 		})
 	}
 
+	/// Fetches all the entries with the hashes in `hashes` and all their parents from the IPFS client `ipfs`.
+	///
+	/// Returns a vector of entries.
+	pub fn fetch_entries (ipfs: &IpfsClient, hashes: &[String]) -> Vec<Entry> {
+		let hashes = Arc::new(Mutex::new(hashes.to_vec()));
+		let mut es = Vec::new();
+		loop {
+			let mut result = Vec::new();
+			while !hashes.lock().unwrap().is_empty() {
+				let h = hashes.lock().unwrap().remove(0);
+				let hashes_clone = hashes.clone();
+				result.push(Entry::from_multihash(ipfs,&h).
+				map(move |x| {
+					for n in &x.next {
+						hashes_clone.lock().unwrap().push(n.to_owned());
+					}
+					x
+				}));
+			}
+			es = es.into_iter().chain(Runtime::new().unwrap().block_on(join_all(result)).
+			unwrap().into_iter()).collect::<Vec<Entry>>();
+			if hashes.lock().unwrap().is_empty() {
+				break;
+			}
+		}
+		es
+	}
+
 	/// Returns the hash of the entry.
 	pub fn hash (&self) -> &str {
 		&self.hash
+	}
+
+	/// Sets the hash of the entry.
+	pub fn set_hash(&mut self, hash: &str) {
+		self.hash = hash.to_owned();
 	}
 
 	/// Returns the identifier of the entry that is the same as of the containing log.
