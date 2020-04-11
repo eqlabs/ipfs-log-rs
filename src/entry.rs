@@ -1,17 +1,17 @@
 use std::cmp::Ordering;
 use std::rc::Rc;
-use std::sync::Arc;
-use std::sync::Mutex;
+// use std::sync::Arc;
+// use std::sync::Mutex;
 use serde_json::json;
 use serde::{Serialize,Deserialize};
 
-use std::io::Cursor;
-use futures::{future::{Future,join_all},stream::Stream};
-use tokio::runtime::Runtime;
-use ipfs_api::{IpfsClient,response::Error};
+// use futures::{future::{Future,join_all}};
 
 use crate::lamport_clock::LamportClock;
 use crate::identity::Identity;
+
+use cid::{Cid, Codec, Version};
+use multihash::Multihash;
 
 /// A wrapper containing either a reference to an entry
 /// or a hash as a string.
@@ -24,12 +24,12 @@ pub enum EntryOrHash<'a> {
 /// and pointers to its parents.
 ///
 /// [`IPFS`]: https://ipfs.io
-#[derive(Clone,Debug,Serialize,Deserialize)]
+// #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct Entry {
-	hash: String,
+	hash: Multihash,
 	id: String,
-	payload: String,
-	next: Vec<String>,
+	payload: Vec<u8>,
+	next: Vec<Multihash>,
 	v: u32,
 	clock: LamportClock,
 }
@@ -37,29 +37,35 @@ pub struct Entry {
 impl Entry {
 	//very ad hoc
 	#[doc(hidden)]
-	pub fn empty () -> Entry {
-		let s = "0000";
-		Entry {
-			hash: s.to_owned(),
-			id: s.to_owned(),
-			payload: s.to_owned(),
-			next: Vec::new(),
-			v: 0,
-			clock: LamportClock::new(s),
-		}
-	}
+	// pub fn empty () -> Entry {
+	// 	let s = "0000";
+	// 	Entry {
+	// 		hash: s.to_owned(),
+	// 		id: s.to_owned(),
+	// 		payload: s.to_owned(),
+	// 		next: Vec::new(),
+	// 		v: 0,
+	// 		clock: LamportClock::new(s),
+	// 	}
+	// }
 
 	#[doc(hidden)]
-	pub fn new (identity: Identity, log_id: &str, data: &str,
-	next: &[EntryOrHash], clock: Option<LamportClock>) -> Entry {
+	pub fn new (
+            identity: Identity,
+            log_id: &str,
+            data: &[u8],
+	    next: Vec<Multihash>,
+            clock: Option<LamportClock>
+        ) -> Entry {
 		//None filtering required?
-		let next = next.iter().map(|n| match n {
-			EntryOrHash::Entry(e)	=>	e.hash.to_owned(),
-			EntryOrHash::Hash(h)	=>	h.to_owned(),
-		}).collect();
+		// let next = next.iter().map(|n| match n {
+		// 	EntryOrHash::Entry(e)	=>	e.hash.to_owned(),
+		// 	EntryOrHash::Hash(h)	=>	h.to_owned(),
+		// }).collect();
+                let hash = multihash::Sha2_256::digest(data);
 		Entry {
 			//very much ad hoc
-			hash: data.to_owned(),
+			hash,
 			id: log_id.to_owned(),
 			payload: data.to_owned(),
 			next: next,
@@ -80,76 +86,86 @@ impl Entry {
 	/// [log]: ../log/struct.Log.html
 	/// [Lamport clock]: ../lamport_clock/struct.LamportClock.html
 	/// [reference-counting pointer]: https://doc.rust-lang.org/std/rc/struct.Rc.html
-	pub fn create (ipfs: &IpfsClient, identity: Identity, log_id: &str, data: &str,
-	nexts: &[EntryOrHash], clock: Option<LamportClock>) -> Rc<Entry> {
+	pub fn create (
+            identity: Identity,
+            log_id: &str,
+            data: &[u8],
+	    nexts: Vec<Multihash>,
+            clock: Option<LamportClock>
+        ) -> Rc<Entry> {
 		let mut e = Entry::new(identity,log_id,data,nexts,clock);
-		e.hash = Runtime::new().unwrap().block_on(Entry::multihash(ipfs,&e)).unwrap();
+		// e.set_hash(Entry::multihash(&e).unwrap());
 		Rc::new(e)
 	}
 
 	/// Stores `entry` in the IPFS client `ipfs` and returns a future containing its multihash.
 	///
 	/// **N.B.** *At the moment stores the entry as JSON, not CBOR DAG.*
-	pub fn multihash (ipfs: &IpfsClient, entry: &Entry) -> impl Future<Item = String,Error = Error> + Send {
-		let e = json!({
-			"hash": "null",
-			"id": entry.id,
-			"payload": entry.payload,
-			"next": entry.next,
-			"v": entry.v,
-			"clock": entry.clock,
-		}).to_string();
-		ipfs.add(Cursor::new(e)).map(|x| x.hash)
-	}
+	// pub fn multihash (entry: &Entry) -> Result<Multihash, cid::Error> {
+	// 	let e: String = json!({
+	// 		"hash": "null",
+	// 		"id": entry.id,
+	// 		"payload": entry.payload,
+	// 		"next": entry.next,
+	// 		"v": entry.v,
+	// 		"clock": entry.clock,
+	// 	}).to_string();
+
+        //         let h = multihash::Sha2_256::digest(e.as_bytes());
+        //         Ok(h)
+
+        //         // TODO: replace with multihash and cid crates
+	// 	// ipfs.add(Cursor::new(e)).map(|x| x.hash)
+	// }
 
 	/// Returns the future containing the entry stored in the IPFS client `ipfs` with the multihash `hash`.
 	///
 	/// **N.B.** *At the moment converts the entry from JSON, not CBOR DAG.*
-	pub fn from_multihash (ipfs: &IpfsClient, hash: &str) -> impl Future<Item = Entry,Error = Error> + Send {
-		let h = hash.to_owned();
-		ipfs.cat(hash).concat2().map(|x| {
-			let mut e: Entry = serde_json::from_str(std::str::from_utf8(&x).unwrap()).unwrap();
-			e.hash = h;
-			e
-		})
-	}
+	/// pub fn from_multihash (ipfs: &IpfsClient, hash: &str) -> impl Future<Item = Entry,Error = Error> + Send {
+	/// 	let h = hash.to_owned();
+	/// 	ipfs.cat(hash).concat2().map(|x| {
+	/// 		let mut e: Entry = serde_json::from_str(std::str::from_utf8(&x).unwrap()).unwrap();
+	/// 		e.hash = h;
+	/// 		e
+	/// 	})
+	/// }
 
 	/// Fetches all the entries with the hashes in `hashes` and all their parents from the IPFS client `ipfs`.
 	///
 	/// Returns a vector of entries.
-	pub fn fetch_entries (ipfs: &IpfsClient, hashes: &[String]) -> Vec<Entry> {
-		let hashes = Arc::new(Mutex::new(hashes.to_vec()));
-		let mut es = Vec::new();
-		loop {
-			let mut result = Vec::new();
-			while !hashes.lock().unwrap().is_empty() {
-				let h = hashes.lock().unwrap().remove(0);
-				let hashes_clone = hashes.clone();
-				result.push(Entry::from_multihash(ipfs,&h).
-				map(move |x| {
-					for n in &x.next {
-						hashes_clone.lock().unwrap().push(n.to_owned());
-					}
-					x
-				}));
-			}
-			es = es.into_iter().chain(Runtime::new().unwrap().block_on(join_all(result)).
-			unwrap().into_iter()).collect::<Vec<Entry>>();
-			if hashes.lock().unwrap().is_empty() {
-				break;
-			}
-		}
-		es
-	}
+	// pub fn fetch_entries (ipfs: &IpfsClient, hashes: &[String]) -> Vec<Entry> {
+	// 	let hashes = Arc::new(Mutex::new(hashes.to_vec()));
+	// 	let mut es = Vec::new();
+	// 	loop {
+	// 		let mut result = Vec::new();
+	// 		while !hashes.lock().unwrap().is_empty() {
+	// 			let h = hashes.lock().unwrap().remove(0);
+	// 			let hashes_clone = hashes.clone();
+	// 			result.push(Entry::from_multihash(ipfs,&h).
+	// 			map(move |x| {
+	// 				for n in &x.next {
+	// 					hashes_clone.lock().unwrap().push(n.to_owned());
+	// 				}
+	// 				x
+	// 			}));
+	// 		}
+	// 		es = es.into_iter().chain(Runtime::new().unwrap().block_on(join_all(result)).
+	// 		unwrap().into_iter()).collect::<Vec<Entry>>();
+	// 		if hashes.lock().unwrap().is_empty() {
+	// 			break;
+	// 		}
+	// 	}
+	// 	es
+	// }
 
 	/// Returns the hash of the entry.
-	pub fn hash (&self) -> &str {
+	pub fn hash (&self) -> &Multihash {
 		&self.hash
 	}
 
 	/// Sets the hash of the entry.
-	pub fn set_hash(&mut self, hash: &str) {
-		self.hash = hash.to_owned();
+	pub fn set_hash(&mut self, hash: Multihash) {
+		self.hash = hash;
 	}
 
 	/// Returns the identifier of the entry that is the same as of the containing log.
@@ -158,7 +174,7 @@ impl Entry {
 	}
 
 	/// Returns the data payload of the entry.
-	pub fn payload (&self) -> &str {
+	pub fn payload (&self) -> &Vec<u8> {
 		&self.payload
 	}
 
@@ -167,7 +183,7 @@ impl Entry {
 	/// The length of the returned slice is either:
 	/// * 0 &mdash; no parents
 	/// * 2 &mdash; two identical strings for one parent, two distinct strings for two different parents
-	pub fn next (&self) -> &[String] {
+	pub fn next (&self) -> &[Multihash] {
 		&self.next
 	}
 
