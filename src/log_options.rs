@@ -1,10 +1,12 @@
+//! Options for the `Log` trait
+
 use crate::entry::Entry;
 use crate::lamport_clock::LamportClock;
 use crate::log::AdHocAccess;
 // use std::cmp::Ordering;
 use crate::identity::Identity;
 use cid::Cid;
-use multihash::Multihash;
+// use multihash::Multihash;
 
 /// Options for constructing [`Log`].
 ///
@@ -22,6 +24,16 @@ use multihash::Multihash;
 /// ```
 ///
 /// [`Log`]: ./struct.Log.html
+
+#[derive(Debug)]
+pub enum SortMethod {
+    /// Last write wins sorting strategy
+    LastWriteWins,
+}
+
+#[derive(Debug)]
+
+/// Log Options
 pub struct LogOptions {
     id: Option<String>,
     identity: Option<Identity>,
@@ -31,7 +43,7 @@ pub struct LogOptions {
     // TODO: Convert to enum of different clocks
     clock: Option<LamportClock>,
     // TODO: Convert to enum of different sorting strategies, don't pass a function
-    // fn_sort: Option<Box<dyn Fn(&Entry, &Entry) -> Ordering>>,
+    strategy: SortMethod,
 }
 
 impl Default for LogOptions {
@@ -43,6 +55,7 @@ impl Default for LogOptions {
             entries: Vec::<Entry>::new(),
             heads: Vec::<Cid>::new(),
             clock: None,
+            strategy: SortMethod::LastWriteWins,
         }
     }
 }
@@ -53,21 +66,32 @@ impl LogOptions {
         LogOptions::default()
     }
 
+    /// Getter for access
     pub fn access(&self) -> AdHocAccess {
         self.access
     }
+
+    /// Getter for id
     pub fn id(&self) -> Option<String> {
         self.id.clone()
     }
+
+    /// Getter for clock
     pub fn clock(&self) -> Option<LamportClock> {
         self.clock.clone()
     }
+
+    /// Getter for entries
     pub fn entries(&self) -> Vec<Entry> {
         self.entries.clone()
     }
+
+    /// Getter for heads
     pub fn heads(&self) -> Vec<Cid> {
         self.heads.clone()
     }
+
+    /// Getter for identity
     pub fn identity(&self) -> Option<Identity> {
         self.identity.clone()
     }
@@ -149,6 +173,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore]
     fn set_items() {
         let identity = identity1();
 
@@ -195,7 +220,7 @@ pub mod tests {
         // TODO: Let's remove set_heads or make either or?
         // .set_heads(&[&e3]),
 
-        let log = Log::new(identity, &options);
+        let _log = Log::new(identity, &options);
 
         // assert_eq!(log.heads().len(), 1);
         // assert_eq!(log.heads()[0].hash(),e3.hash());

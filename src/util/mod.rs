@@ -1,7 +1,7 @@
 // use std::rc::Rc;
 // use std::collections::{ HashSet, HashMap };
 
-use multihash::Multihash;
+// use multihash::Multihash;
 
 use crate::entry::Entry;
 
@@ -16,7 +16,7 @@ pub fn find_children(entry: &Entry, hashes: &[String]) -> Vec<String> {
     let mut parent = hashes.iter().find(|hash| is_parent(entry, hash));
     while let Some(p) = parent {
         stack.push(p.clone());
-        let prev = p;
+        let _prev = p;
         parent = hashes.iter().find(|hash| is_parent(entry, hash));
     }
     // stack.sort_by(|a, b| a.clock().time().cmp(&b.clock().time()));

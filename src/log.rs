@@ -1,3 +1,5 @@
+//! An immutable, operation-based conflict-free replicated data type ([CRDT]).
+
 use crate::entry::Entry;
 use crate::identity::Identity;
 use crate::lamport_clock::LamportClock;
@@ -6,145 +8,50 @@ use multihash::Multihash;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::time::SystemTime;
+// use std::time::SystemTime;
 
 use crate::log_options::LogOptions;
 use crate::util::find_children;
 
-use libipld::cbor::DagCborCodec;
+use libipld::{ipld, Ipld, cbor::DagCborCodec, cbor::Codec };
 
-/// An immutable, operation-based conflict-free replicated data type ([CRDT]).
-///
 /// [CRDT]: https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct Log {
     id: String,
     identity: Identity,
     access: AdHocAccess,
-    entries: HashMap<Cid, Box<[u8]>>,
+    entries: Box<[(Cid, Ipld)]>,
     nexts: HashSet<Cid>,
     heads: HashSet<Cid>,
     clock: LamportClock,
 }
 
+/// An operation log
 pub trait Oplog {
-    fn heads(&self) -> HashSet<Cid>;
+    /// Appends an item to the Oplog
+    fn append<T>(&mut self, data: T) -> Result<(), libipld::cbor::CborError>
+    where
+        T: std::convert::AsRef<[u8]>;
+
+    /// Returns the length of the Oplog
     fn length(&self) -> usize;
 }
 
+/// Conflict Free Replicated Data Type
 pub trait CRDT {
+    /// Returns the "heads", or the latest known entries, of the CRDT
+    fn heads(&self) -> HashSet<Cid>;
+
+    /// Lamport Clock
     fn clock(&self) -> LamportClock;
 }
 
 impl Oplog for Log {
-    fn heads(&self) -> HashSet<Cid> {
-        self.heads.clone()
-    }
-
-    fn length(&self) -> usize {
-        self.entries.len()
-    }
-}
-
-impl CRDT for Log {
-    // fn sort(&self) -> Box<dyn Fn(&Entry, &Entry) -> Ordering> {}
-
-    fn clock(&self) -> LamportClock {
-        self.clock.clone()
-    }
-}
-
-impl Log {
-    /// Constructs a new log owned by `identity`, using `opts` for constructor options.
-    ///
-    /// Use [`LogOptions::new()`] as `opts` for default constructor options.
-    ///
-    /// [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
-    pub fn new(identity: Identity, opts: &LogOptions) -> Log {
-        let (id, access, entries, heads, clock) = (
-            opts.id(),
-            opts.access(),
-            opts.entries(),
-            opts.heads(),
-            opts.clock(),
-        );
-
-        let id = if let Some(s) = id {
-            s.to_owned()
-        } else {
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                .to_string()
-        };
-
-        // TODO: Let's do this calculation in LogOptions and throw it awy
-        // let heads = Log::dedup(&if heads.is_empty() {
-        //     Log::find_heads(&entries)
-        // } else {
-        let mut heads_set = HashSet::<Cid>::new();
-        for head in heads {
-            heads_set.insert(head.to_owned());
-        }
-        // });
-
-        let mut nexts = HashSet::new();
-        //for e in entries.clone() {
-        //    for n in e.next() {
-        //        nexts.insert(n.to_owned());
-        //    }
-        //}
-
-        let mut entry_set = HashMap::new();
-        for entry in entries {
-            // Convert to CBOR, hash, etc.
-            // Move to append
-            //let hash = multihash::Sha2_256::digest(&entry.payload());
-            // entry_set.insert(hash, entry.clone());
-        }
-
-        let mut t_max = 0;
-        if let Some(c) = clock {
-            t_max = c.time();
-        }
-        // for h in heads {
-        //     t_max = std::cmp::max(t_max, entries.get(h).unwrap().clock().time());
-        // }
-        let clock = LamportClock::new(identity.pub_key()).set_time(t_max);
-
-        // println!("{:?}", heads);
-
-        Log {
-            id: id.to_owned(),
-            identity: identity,
-            access: access,
-            entries: entry_set,
-            nexts,
-            clock,
-            heads: heads_set,
-        }
-    }
-
-    // Constructs a new log with the identity `identity` from an entry with the hash `hash`,
-    // using `opts` for constructor options.
-    //
-    // Use [`LogOptions::new()`] as `opts` for default constructor options.
-    //
-    // **N.B.** [`opts.entries(/* entries */)`] *and* [`opts.heads(/* heads */)`] *have no effect in the log created.*
-    //
-    // [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
-    // [`opts.entries(/* entries */)`]: ./struct.LogOptions.html#method.entries
-    // [`opts.heads(/* heads */)`]: ./struct.LogOptions.html#method.heads
-    // pub fn from_multihash (ipfs: Rc<IpfsClient>, identity: Identity, opts: LogOptions, hash: &str) -> Log {
-    // 	let es = Entry::fetch_entries(&ipfs,&[hash.to_owned()]).into_iter().map(|x| Rc::new(x)).collect::<Vec<Rc<Entry>>>();
-    // 	Log::new(ipfs,identity,opts.entries(&es).heads(&[]))
-    // }
-
     /// Appends `data` into the log as a new entry.
     ///
     /// Returns a reference to the newly created, appended entry.
-    pub fn append<T>(&mut self, data: T, n_ptr: Option<usize>) -> Multihash
+    fn append<T>(&mut self, data: T) -> Result<(), libipld::cbor::CborError>
     where
         T: std::convert::AsRef<[u8]>,
     {
@@ -168,11 +75,10 @@ impl Log {
         // self.heads = Log::dedup(&self.heads);
         // self.heads.append(&mut refs);
 
-        //let entry = Entry::new(&self.identity, &self.id, data.as_ref(), &self.nexts, None);
+        // let entry = Entry::new(&self.identity, &self.id, data.as_ref(), &self.nexts, None);
 
         // Hash entry here, the entry doesnt care about its own hash, it can't.
         // TODO: CBOR encode?
-        // let hash = multihash::Sha2_256::digest(data); // data);
 
         //&self.heads().iter().map(|x| EntryOrHash::Hash(x.hash().to_owned())).collect::<Vec<_>>()[..],
         //Some(self.clock().clone()));
@@ -193,10 +99,121 @@ impl Log {
         // self.heads.push(rc);
         // self.length += 1;
 
-        let hash = multihash::Sha2_256::digest(b"xxxx"); // data);
-        hash
-        // &self.entries[&eh]
+        let ipld = ipld!({ "data": data.as_ref() });
+        let bytes = DagCborCodec::encode(&ipld)?;
+        let hash = multihash::Sha2_256::digest(&bytes);
+        let cid = Cid::new(cid::Version::V1, cid::Codec::DagProtobuf, hash)?;
+
+        // TODO: How to do this without the intermediary Vec?
+        let mut entries_buffer = self.entries.to_vec();
+        entries_buffer.push((cid, ipld));
+        self.entries = entries_buffer.into_boxed_slice();
+
+        Ok(())
     }
+
+    fn length(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+impl CRDT for Log {
+    // fn sort(&self) -> Box<dyn Fn(&Entry, &Entry) -> Ordering> {}
+
+    fn heads(&self) -> HashSet<Cid> {
+        self.heads.clone()
+    }
+
+    fn clock(&self) -> LamportClock {
+        self.clock.clone()
+    }
+}
+
+impl Log {
+    /// Constructs a new log owned by `identity`, using `opts` for constructor options.
+    ///
+    /// Use [`LogOptions::new()`] as `opts` for default constructor options.
+    ///
+    /// [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
+    pub fn new(identity: Identity, opts: &LogOptions) -> Log {
+        let (id, access, _entries, _heads, _clock) = (
+            opts.id(),
+            opts.access(),
+            opts.entries(),
+            opts.heads(),
+            opts.clock(),
+        );
+
+        // let id = if let Some(s) = id {
+        //     s.to_owned()
+        // } else {
+        //     SystemTime::now()
+        //         .duration_since(SystemTime::UNIX_EPOCH)
+        //         .unwrap()
+        //         .as_millis()
+        //         .to_string()
+        // };
+
+        // TODO: Let's do this calculation in LogOptions and throw it awy
+        // let heads = Log::dedup(&if heads.is_empty() {
+        //     Log::find_heads(&entries)
+        // } else {
+        // let mut heads_set = HashSet::<Cid>::new();
+        // for head in heads {
+        //     heads_set.insert(head.to_owned());
+        // }
+        // });
+
+        // let nexts = HashSet::new();
+        //for e in entries.clone() {
+        //    for n in e.next() {
+        //        nexts.insert(n.to_owned());
+        //    }
+        //}
+
+        // let entry_set = HashMap::new();
+        // for entry in entries {
+        //     // Convert to CBOR, hash, etc.
+        //     // Move to append
+        //     let hash = multihash::Sha2_256::digest(&entry.payload());
+        //     // entry_set.insert(hash, entry.clone());
+        // }
+
+        // if let Some(c) = clock {
+        //     t_max = c.time();
+        // }
+        // for h in heads {
+        //     t_max = std::cmp::max(t_max, entries.get(h).unwrap().clock().time());
+        // }
+        let clock = LamportClock::new(identity.pub_key()).set_time(0);
+
+        // println!("{:?}", heads);
+
+        Log {
+            id: id.unwrap(),
+            identity: identity,
+            access: access,
+            entries: Box::new([]),
+            nexts: HashSet::new(),
+            clock,
+            heads: HashSet::new(),
+        }
+    }
+
+    // Constructs a new log with the identity `identity` from an entry with the hash `hash`,
+    // using `opts` for constructor options.
+    //
+    // Use [`LogOptions::new()`] as `opts` for default constructor options.
+    //
+    // **N.B.** [`opts.entries(/* entries */)`] *and* [`opts.heads(/* heads */)`] *have no effect in the log created.*
+    //
+    // [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
+    // [`opts.entries(/* entries */)`]: ./struct.LogOptions.html#method.entries
+    // [`opts.heads(/* heads */)`]: ./struct.LogOptions.html#method.heads
+    // pub fn from_multihash (ipfs: Rc<IpfsClient>, identity: Identity, opts: LogOptions, hash: &str) -> Log {
+    // 	let es = Entry::fetch_entries(&ipfs,&[hash.to_owned()]).into_iter().map(|x| Rc::new(x)).collect::<Vec<Rc<Entry>>>();
+    // 	Log::new(ipfs,identity,opts.entries(&es).heads(&[]))
+    // }
 
     // Joins the log `other` into this log. `other` is kept intact through and after the process.
     //
@@ -301,17 +318,18 @@ impl Log {
     // }
 
     /// Returns a pointer to the entry with the hash `hash`.
-    pub fn get(&self, cid: &Cid) -> Option<&Box<[u8]>> {
-        self.entries.get(cid)
+    pub fn get_entry_by_cid(&self, lookup: &Cid) -> Option<&(Cid, Ipld)> {
+        let index = self.entries.iter().position(|(cid, _)| cid == lookup).unwrap();
+        self.entries.get(index)
     }
 
-    fn dedup(v: Vec<Entry>) -> Vec<Entry> {
-        // let mut s = HashSet::new();
-        v.iter()
-            // .filter(|x| s.insert(x.hash()))
-            .map(|x| x.to_owned())
-            .collect()
-    }
+    // fn dedup(v: Vec<Entry>) -> Vec<Entry> {
+    //     // let mut s = HashSet::new();
+    //     v.iter()
+    //         // .filter(|x| s.insert(x.hash()))
+    //         .map(|x| x.to_owned())
+    //         .collect()
+    // }
 
     // pub fn set_identity (&mut self, identity: Identity) {
     // 	let mut t_max = 0;
@@ -383,11 +401,12 @@ impl Log {
     // 	s
     // }
 
+    /// Traverse the oplog by nexts / refs
     pub fn traverse(
         &self,
-        roots: &[Rc<Entry>],
-        amount: Option<usize>,
-        end_hash: Option<String>,
+        _roots: &[Rc<Entry>],
+        _amount: Option<usize>,
+        _end_hash: Option<String>,
     ) -> Vec<&Entry> {
         Vec::<&Entry>::new()
 
@@ -479,14 +498,14 @@ impl Log {
 }
 
 impl std::fmt::Display for Log {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut es = self.values();
         es.reverse();
 
         let hashes: Vec<String> = self
             .entries
             .iter()
-            .map(|(hash, entry)| hash.to_owned().to_string())
+            .map(|(hash, _entry)| hash.to_owned().to_string())
             .collect();
 
         let mut s = String::new();
@@ -508,11 +527,11 @@ impl std::fmt::Display for Log {
 }
 
 #[doc(hidden)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct AdHocAccess;
 
 impl AdHocAccess {
-    fn can_access(&self, _entry: &Entry) -> bool {
-        true
-    }
+    // fn can_access(&self, _entry: &Entry) -> bool {
+    //     true
+    // }
 }

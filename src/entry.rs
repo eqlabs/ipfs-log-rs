@@ -1,6 +1,8 @@
+//! Log entry
+
 use std::cmp::Ordering;
-use std::collections::HashSet;
-use std::rc::Rc;
+// use std::collections::HashSet;
+// use std::rc::Rc;
 // use std::sync::Arc;
 // use std::sync::Mutex;
 
@@ -15,7 +17,7 @@ use libipld::DagCbor;
 use crate::identity::Identity;
 use crate::lamport_clock::LamportClock;
 
-use multihash::Multihash;
+// use multihash::Multihash;
 
 use std::convert::From;
 
@@ -116,7 +118,7 @@ impl PartialEq for Entry {
 }
 
 impl std::fmt::Debug for Entry {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         // TODO: Figure out a better way to format these, including a multihash call
         // here, maybe? Since it's Debug
         write!(formatter, "{:?}\n", self.payload)
@@ -141,7 +143,6 @@ impl PartialOrd for Entry {
         Some(self.cmp(other))
     }
 }
-
 
 // Required for multihash digest
 // What can we accomplish here? Compression?

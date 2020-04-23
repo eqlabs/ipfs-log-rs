@@ -1,3 +1,5 @@
+//! Lamport Clock
+
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 

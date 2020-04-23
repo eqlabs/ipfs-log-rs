@@ -1,3 +1,5 @@
+//! Identity for `Log`
+
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -10,7 +12,7 @@ use sha2::{Digest, Sha256};
 use libipld::DagCbor;
 
 /// A struct holding identifier and public key signatures for an identity.
-#[derive(Eq, PartialEq, Clone, DagCbor)]
+#[derive(Debug, Eq, PartialEq, Clone, DagCbor)]
 pub struct Signatures {
     id: String,
     pub_key: String,
@@ -44,7 +46,7 @@ impl Signatures {
 }
 
 /// An identity to determine ownership of the data stored in the log.
-#[derive(Eq, PartialEq, Clone, DagCbor)]
+#[derive(Debug, Eq, PartialEq, Clone, DagCbor)]
 pub struct Identity {
     id: String,
     pub_key: String,
@@ -99,6 +101,8 @@ impl PartialOrd for Identity {
 }
 
 ///A secret key&mdash;public key pair.
+
+#[derive(Debug)]
 pub struct Keys {
     sec_key: String,
     pub_key: String,
@@ -151,6 +155,7 @@ pub trait Identificator {
 ///
 /// [*identificator*]: ./trait.Identificator.html
 /// [implementation]: https://github.com/orbitdb/orbit-db-identity-provider/blob/master/src/orbit-db-identity-provider.js
+#[derive(Debug)]
 pub struct DefaultIdentificator {
     secp: Secp256k1<All>,
     keystore: HashMap<String, Keys>,

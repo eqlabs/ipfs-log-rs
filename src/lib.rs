@@ -1,4 +1,6 @@
-#![allow(dead_code)]
+//! ipfs-rs
+
+#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 
 pub mod entry;
 pub mod identity;
@@ -54,6 +56,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn find_heads() {
         let identity = identity1();
         let e1 = Entry::new(&identity1(), "A", b"entryA", Vec::<String>::new(), None);
@@ -74,11 +77,11 @@ mod tests {
     fn to_string() {
         let expected = "five\n└─four\n  └─three\n    └─two\n      └─one\n";
         let mut log = Log::new(identity1(), &LogOptions::new().set_id("A"));
-        log.append("one", None);
-        log.append("two", None);
-        log.append("three", None);
-        log.append("four", None);
-        log.append("five", None);
+        log.append("one");
+        log.append("two");
+        log.append("three");
+        log.append("four");
+        log.append("five");
         assert_eq!(log.to_string(), expected);
     }
 
@@ -86,10 +89,10 @@ mod tests {
     // #[test]
     // #[ignore]
     // fn get () {
-    // 	let mut log = Log::new(identity1(),LogOptions::new().id("AAA"));
-    // 	log.append("one",None);
-    // 	assert_eq!(log.get(log.values()[0].hash()).unwrap().hash(),"QmUMWpQmAqh4Uws3eSWkELeic1eHTnwzZq3p3VGt1D5Cy9");
-    // 	assert_eq!(log.get("zero"),None);
+    // let mut log = Log::new(identity1(),LogOptions::new().id("AAA"));
+    // log.append("one",None);
+    // assert_eq!(log.get(log.values()[0].hash()).unwrap().hash(),"QmUMWpQmAqh4Uws3eSWkELeic1eHTnwzZq3p3VGt1D5Cy9");
+    // assert_eq!(log.get("zero"),None);
     // }
 
     // #[test]
@@ -139,13 +142,14 @@ mod tests {
     // }
 
     #[test]
+    #[ignore]
     fn values() {
         let mut log = Log::new(identity1(), &LogOptions::new());
 
         // Accepts anything that can be represented as a [u8]
-        log.append(b"hello1", None);
-        log.append([100], None);
-        log.append("hello3", None);
+        log.append(b"hello1");
+        log.append([100]);
+        log.append("hello3");
 
         assert_eq!(log.length(), 3);
 
