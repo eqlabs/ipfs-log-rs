@@ -1,142 +1,105 @@
 //! An immutable, operation-based conflict-free replicated data type ([CRDT]).
 
+use std::collections::HashMap;
+use std::iter::{once, successors};
+
+use ipfs::{ Ipfs, IpfsTypes };
+use libipld::{ipld, Ipld};
+
 use crate::entry::Entry;
 use crate::identity::Identity;
 use crate::lamport_clock::LamportClock;
 use cid::Cid;
-use multihash::Multihash;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::rc::Rc;
-// use std::time::SystemTime;
 
 use crate::log_options::LogOptions;
-use crate::util::find_children;
 
-use libipld::{ipld, Ipld, cbor::DagCborCodec, cbor::Codec };
 
 /// [CRDT]: https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type
+/// ![CRDT Diagram](./doc/img/pow-of-2.svg)
 #[derive(Debug)]
-pub struct Log {
+pub struct Log<Types: IpfsTypes> {
     id: String,
-    identity: Identity,
-    access: AdHocAccess,
-    entries: Box<[(Cid, Ipld)]>,
-    nexts: HashSet<Cid>,
-    heads: HashSet<Cid>,
+    ipfs: Ipfs<Types>,
+    // identity: Identity,
+    // access: AdHocAccess,
+    // entries: HashMap<Cid, Ipld>,
+    // nexts: HashSet<Cid>,
+    heads: Vec<Cid>,
     clock: LamportClock,
 }
 
-/// An operation log
-pub trait Oplog {
-    /// Appends an item to the Oplog
-    fn append<T>(&mut self, data: T) -> Result<(), libipld::cbor::CborError>
-    where
-        T: std::convert::AsRef<[u8]>;
+/// Gets every pow 2
+fn get_every_pow_2(all_entries: Vec<Cid>) -> Vec<Ipld> {
+    let mut entries = Vec::new();
 
-    /// Returns the length of the Oplog
-    fn length(&self) -> usize;
+    for i in once(0).chain(successors(Some(1usize), |&i| i.checked_mul(2))) {
+        if let Some(entry) = all_entries.get(i) {
+            let ipld = ipld!(entry.to_string());
+            entries.push(ipld);
+        }
+    }
+
+    entries
 }
 
-/// Conflict Free Replicated Data Type
-pub trait CRDT {
-    /// Returns the "heads", or the latest known entries, of the CRDT
-    fn heads(&self) -> HashSet<Cid>;
-
-    /// Lamport Clock
-    fn clock(&self) -> LamportClock;
-}
-
-impl Oplog for Log {
+impl<Types: IpfsTypes> Log<Types> {
     /// Appends `data` into the log as a new entry.
     ///
-    /// Returns a reference to the newly created, appended entry.
-    fn append<T>(&mut self, data: T) -> Result<(), libipld::cbor::CborError>
+    /// Returns a reference to the newly creTypesated, appended entry.
+    pub async fn append<T>(&mut self, data: T) -> Result<(), anyhow::Error>
     where
         T: std::convert::AsRef<[u8]>,
     {
-        // let mut t_new = self.clock().time();
-        // for h in &self.heads() {
-        // 	t_new = max(t_new,h.clock().time());
-        // }
-        // t_new = t_new + 1;
-        // self.clock = LamportClock::new(self.clock.id()).set_time(t_new);
+        // Increment the clock
+        self.clock.tick();
 
-        // let mut heads = Vec::new();
-        // for h in &self.heads() {
-        //     heads.push(h.clone());
-        // }
-        // let mut refs = self.traverse(
-        //     &heads[..],
-        //     Some(std::cmp::max(n_ptr.unwrap_or(1), self.heads().len())),
-        //     None,
-        // );
-        // self.heads.reverse();
-        // self.heads = Log::dedup(&self.heads);
-        // self.heads.append(&mut refs);
+        let refs = get_every_pow_2(self.traverse(self.heads()).await);
 
-        // let entry = Entry::new(&self.identity, &self.id, data.as_ref(), &self.nexts, None);
+        let ipld = ipld!({
+            "clock": {
+                "id": self.clock.id(),
+                "time": self.clock.time()
+            },
+            "refs": refs,
+            "payload": data.as_ref()
+        });
+        // let bytes = DagCborCodec::encode(&ipld)?;
+        // let hash = multihash::Sha2_256::digest(&bytes);
+        // let cid = Cid::new(cid::Version::V1, cid::Codec::DagCBOR, hash)?;
 
-        // Hash entry here, the entry doesnt care about its own hash, it can't.
-        // TODO: CBOR encode?
 
-        //&self.heads().iter().map(|x| EntryOrHash::Hash(x.hash().to_owned())).collect::<Vec<_>>()[..],
-        //Some(self.clock().clone()));
-        // entry.set_hash(&Runtime::new().unwrap().block_on(Entry::multihash(&self.ipfs,&entry)).unwrap());
-        //should be queried asynchronically
-        // if !self.access.can_access(&entry) {
-        // 	panic!("Could not append entry, key \"{}\" is not allowed to write in the log",
-        // 	self.identity.id());
-        // }
 
-        // let eh = entry.hash();
-        // let rc = Rc::new(entry);
-        // self.entries.insert(eh.to_owned(), rc.clone());
-        // for h in &self.heads() {
-        //     self.nexts.insert(h.hash().to_owned());
-        // }
-        // self.heads.clear();
-        // self.heads.push(rc);
-        // self.length += 1;
+        println!("{:?}", &ipld);
+        let cid = self.ipfs.put_dag(ipld).await?;
+        println!("{:?}", &cid.to_string());
 
-        let ipld = ipld!({ "data": data.as_ref() });
-        let bytes = DagCborCodec::encode(&ipld)?;
-        let hash = multihash::Sha2_256::digest(&bytes);
-        let cid = Cid::new(cid::Version::V1, cid::Codec::DagProtobuf, hash)?;
-
-        // TODO: How to do this without the intermediary Vec?
-        let mut entries_buffer = self.entries.to_vec();
-        entries_buffer.push((cid, ipld));
-        self.entries = entries_buffer.into_boxed_slice();
+        self.heads.truncate(0);
+        self.heads.push(cid);
 
         Ok(())
     }
 
     fn length(&self) -> usize {
-        self.entries.len()
-    }
-}
-
-impl CRDT for Log {
-    // fn sort(&self) -> Box<dyn Fn(&Entry, &Entry) -> Ordering> {}
-
-    fn heads(&self) -> HashSet<Cid> {
-        self.heads.clone()
+        //self.entries.len()
+        0
     }
 
-    fn clock(&self) -> LamportClock {
+    /// Returns the log's current clock
+    pub fn clock(&self) -> LamportClock {
         self.clock.clone()
     }
-}
 
-impl Log {
     /// Constructs a new log owned by `identity`, using `opts` for constructor options.
     ///
     /// Use [`LogOptions::new()`] as `opts` for default constructor options.
     ///
     /// [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
-    pub fn new(identity: Identity, opts: &LogOptions) -> Log {
-        let (id, access, _entries, _heads, _clock) = (
+    pub fn new (
+        ipfs: &Ipfs<Types>,
+        identity: Identity,
+        opts: &LogOptions,
+    ) -> Log<Types> {
+        let (id, _access, _entries, _heads, _clock) = (
             opts.id(),
             opts.access(),
             opts.entries(),
@@ -191,12 +154,13 @@ impl Log {
 
         Log {
             id: id.unwrap(),
-            identity: identity,
-            access: access,
-            entries: Box::new([]),
-            nexts: HashSet::new(),
+            ipfs: ipfs.clone(),
+            // identity: identity,
+            // access: access,
+            // entries: HashMap::new(),
+            // nexts: HashSet::new(),
             clock,
-            heads: HashSet::new(),
+            heads: Vec::new(),
         }
     }
 
@@ -307,9 +271,9 @@ impl Log {
     }
 
     /// Returns the identity of the owner of the log
-    pub fn identity(&self) -> Identity {
-        self.identity.clone()
-    }
+    // pub fn identity(&self) -> Identity {
+    //     self.identity.clone()
+    // }
 
     // /// Returns `true` if the log contains an entry with the hash `hash`.
     // /// Otherwise returns `false`.
@@ -318,10 +282,9 @@ impl Log {
     // }
 
     /// Returns a pointer to the entry with the hash `hash`.
-    pub fn get_entry_by_cid(&self, lookup: &Cid) -> Option<&(Cid, Ipld)> {
-        let index = self.entries.iter().position(|(cid, _)| cid == lookup).unwrap();
-        self.entries.get(index)
-    }
+    // pub fn get_entry_by_cid(&self, lookup: &Cid) -> Option<&Ipld> {
+    //     self.entries.get(lookup)
+    // }
 
     // fn dedup(v: Vec<Entry>) -> Vec<Entry> {
     //     // let mut s = HashSet::new();
@@ -354,12 +317,10 @@ impl Log {
         // es
     }
 
-    // pub fn heads (&self) -> Vec<Rc<Entry>> {
-    // 	let mut hs = self.heads().to_owned();
-    // 	hs.sort_by(|a,b| (self.sort())(a,b));
-    // 	hs.reverse();
-    // 	hs
-    // }
+    /// Returns the heads, or latest entries, of the log
+    pub fn heads(&self) -> Vec<Cid> {
+        self.heads.to_owned()
+    }
 
     // pub fn tails (&self) -> Vec<Rc<Entry>> {
     // 	Log::find_tails(&self.values())
@@ -402,14 +363,26 @@ impl Log {
     // }
 
     /// Traverse the oplog by nexts / refs
-    pub fn traverse(
+    /// TODO: Utilize multithreading here
+    pub async fn traverse(
         &self,
-        _roots: &[Rc<Entry>],
-        _amount: Option<usize>,
-        _end_hash: Option<String>,
-    ) -> Vec<&Entry> {
-        Vec::<&Entry>::new()
+        // Increment the clock
+        heads: Vec<Cid>,
+        // _amount: Option<usize>,
+        // _end_hash: Option<String>,
+    ) -> Vec<Cid> {
+        let mut entries = Vec::new();
 
+        // Perhaps not naive by not utilizing multithreading
+        // but also perhaps getting it for free via tokio executor
+        for head in heads {
+            entries.push(head.clone());
+            let ipld = self.ipfs.get_dag(head.into()).await;
+            println!("{:?}", ipld);
+        }
+
+        entries
+        // self.entries.iter().collect()
         // let mut stack = roots.to_owned();
         // stack.sort_by(|a, b| (self.sort())(a, b));
         // stack.reverse();
@@ -497,34 +470,34 @@ impl Log {
     // }
 }
 
-impl std::fmt::Display for Log {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let mut es = self.values();
-        es.reverse();
-
-        let hashes: Vec<String> = self
-            .entries
-            .iter()
-            .map(|(hash, _entry)| hash.to_owned().to_string())
-            .collect();
-
-        let mut s = String::new();
-        for e in es {
-            let parents = find_children(&e, &hashes);
-            if parents.len() >= 1 {
-                if parents.len() >= 2 {
-                    for _ in 0..parents.len() - 1 {
-                        s.push_str("  ");
-                    }
-                }
-                s.push_str("└─");
-            }
-            s.push_str(std::str::from_utf8(&e.payload()).unwrap());
-            s.push_str("\n");
-        }
-        write!(f, "{}", s)
-    }
-}
+// impl std::fmt::Display for Log {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+//         let mut es = self.values();
+//         es.reverse();
+//
+//         let hashes: Vec<String> = self
+//             .entries
+//             .iter()
+//             .map(|(hash, _entry)| hash.to_owned().to_string())
+//             .collect();
+//
+//         let mut s = String::new();
+//         for e in es {
+//             let parents = find_children(&e, &hashes);
+//             if parents.len() >= 1 {
+//                 if parents.len() >= 2 {
+//                     for _ in 0..parents.len() - 1 {
+//                         s.push_str("  ");
+//                     }
+//                 }
+//                 s.push_str("└─");
+//             }
+//             s.push_str(std::str::from_utf8(&e.payload()).unwrap());
+//             s.push_str("\n");
+//         }
+//         write!(f, "{}", s)
+//     }
+// }
 
 #[doc(hidden)]
 #[derive(Debug, Copy, Clone)]

@@ -206,7 +206,7 @@ impl AsRef<[u8]> for Entry {
 // Returns a closure that can be used as a sorting function.
 // pub fn sort_by_clock_ids<F> (resolve: F) -> impl Fn(&Entry,&Entry) -> Ordering
 // where F: 'static + Fn(&Entry,&Entry) -> Ordering {
-// 	move |a,b| {
+//ucian Trestioreanu  	move |a,b| {
 // 		let mut diff = a.clock().id().cmp(&b.clock().id());
 // 		if diff == Ordering::Equal {
 // 			diff = resolve(a,b);
@@ -239,8 +239,8 @@ impl AsRef<[u8]> for Entry {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    use crate::identity::{Identity, Signatures};
+    // use super::*;
+    // use crate::identity::{Identity, Signatures};
 
     //#[test]
     //fn test_multihash_entry() {

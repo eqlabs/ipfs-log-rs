@@ -1,6 +1,4 @@
 //! Lamport Clock
-
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
 use libipld::DagCbor;
@@ -8,7 +6,7 @@ use libipld::DagCbor;
 /// A [Lamport clock] for partial chronological ordering of unconnected events.
 ///
 /// [Lamport clock]: https://en.wikipedia.org/wiki/Lamport_clock
-#[derive(Clone, DagCbor, Debug, Serialize, Deserialize)]
+#[derive(Clone, DagCbor, Debug)]
 pub struct LamportClock {
     id: String,
     time: u64,
@@ -125,7 +123,7 @@ pub mod tests {
 
     #[test]
     fn test_set_time() {
-        let clock = assert_new_clock("test_set_time", 5);
+        assert_new_clock("test_set_time", 5);
     }
 
     #[test]
