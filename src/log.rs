@@ -1,10 +1,9 @@
 //! An immutable, operation-based conflict-free replicated data type ([CRDT]).
 
-use std::collections::HashMap;
 use std::iter::{once, successors};
 
-use ipfs::{ Ipfs, IpfsTypes };
-use libipld::{ipld, Ipld};
+use futures::future::BoxFuture;
+use ipfs::{Ipfs, IpfsTypes};
 
 use crate::entry::Entry;
 use crate::identity::Identity;
@@ -13,9 +12,9 @@ use cid::Cid;
 
 use crate::log_options::LogOptions;
 
-
+/// Log forms the underling Oplog that can power a [CRDT] structure.
+///
 /// [CRDT]: https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type
-/// ![CRDT Diagram](./doc/img/pow-of-2.svg)
 #[derive(Debug)]
 pub struct Log<Types: IpfsTypes> {
     id: String,
@@ -28,14 +27,28 @@ pub struct Log<Types: IpfsTypes> {
     clock: LamportClock,
 }
 
-/// Gets every pow 2
-fn get_every_pow_2(all_entries: Vec<Cid>) -> Vec<Ipld> {
-    let mut entries = Vec::new();
+/// Walks a [`Vec`] of [`Cid`] objects and with every 2^n-th item starting at 2^0:
+///
+/// 1. Converts the [`Cid`] to a string
+/// 2. Encodes the stringified [`Cid`] to [`Ipld`] format using the [`ipld!`] macro.
+/// 3. Pushes it to a `Vec<Ipld>` buffer.
+///
+/// When the first 2^n-th item doesn't exist, the function will return.
+///
+/// ![CRDT Diagram](../img/pow-of-2.svg)
+///
+/// [`Vec`]: https://google.com
+/// [`Cid`]: https://google.com
+/// [`ipld!`]: https://google.com
+/// [`Ipld`]: https://google.com
+pub fn get_every_pow_2(all_entries: Vec<(Cid, Entry)>) -> Vec<Cid> {
+    let mut entries: Vec<Cid> = Vec::new();
 
     for i in once(0).chain(successors(Some(1usize), |&i| i.checked_mul(2))) {
         if let Some(entry) = all_entries.get(i) {
-            let ipld = ipld!(entry.to_string());
-            entries.push(ipld);
+            entries.push(entry.to_owned().0);
+        } else {
+            break;
         }
     }
 
@@ -43,66 +56,58 @@ fn get_every_pow_2(all_entries: Vec<Cid>) -> Vec<Ipld> {
 }
 
 impl<Types: IpfsTypes> Log<Types> {
-    /// Appends `data` into the log as a new entry.
+    /// Appends any &[u8]-compatible `data` into the log as a new entry.
     ///
-    /// Returns a reference to the newly creTypesated, appended entry.
-    pub async fn append<T>(&mut self, data: T) -> Result<(), anyhow::Error>
+    /// Returns a reference to the newly created, appended entry.
+    /// ![Append Diagram](../img/append.svg)
+    ///
+    /// ```rust
+    /// fn main() {
+    /// }
+    /// ```
+    pub async fn append<T>(&mut self, data: T) -> Result<Cid, anyhow::Error>
     where
         T: std::convert::AsRef<[u8]>,
     {
         // Increment the clock
         self.clock.tick();
 
-        let refs = get_every_pow_2(self.traverse(self.heads()).await);
+        // Traverse all log values, and then get every
+        // 2^nth entry starting with n=0 to add to IPLD
+        // as refs
+        let values = self.traverse(self.heads()).await.unwrap();
+        let refs = get_every_pow_2(values);
 
-        let ipld = ipld!({
-            "clock": {
-                "id": self.clock.id(),
-                "time": self.clock.time()
-            },
-            "refs": refs,
-            "payload": data.as_ref()
-        });
-        // let bytes = DagCborCodec::encode(&ipld)?;
-        // let hash = multihash::Sha2_256::digest(&bytes);
-        // let cid = Cid::new(cid::Version::V1, cid::Codec::DagCBOR, hash)?;
-
-
-
-        println!("{:?}", &ipld);
-        let cid = self.ipfs.put_dag(ipld).await?;
-        println!("{:?}", &cid.to_string());
+        let entry = Entry::new(data, &self.clock, &refs);
+        let cid = self.ipfs.put_dag(entry.into()).await?;
 
         self.heads.truncate(0);
-        self.heads.push(cid);
+        self.heads.push(cid.clone());
 
-        Ok(())
+        Ok(cid)
     }
 
-    fn length(&self) -> usize {
-        //self.entries.len()
-        0
+    /// Returns the length of the traversed log
+    /// Requires async because of the traversal itself
+    pub async fn length(&self) -> usize {
+        self.traverse(self.heads()).await.unwrap().len()
     }
 
-    /// Returns the log's current clock
-    pub fn clock(&self) -> LamportClock {
-        self.clock.clone()
-    }
+    // Returns the log's current clock
+    // pub fn clock(&self) -> LamportClock {
+    //     self.clock.clone()
+    // }
 
     /// Constructs a new log owned by `identity`, using `opts` for constructor options.
     ///
     /// Use [`LogOptions::new()`] as `opts` for default constructor options.
     ///
     /// [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
-    pub fn new (
-        ipfs: &Ipfs<Types>,
-        identity: Identity,
-        opts: &LogOptions,
-    ) -> Log<Types> {
-        let (id, _access, _entries, _heads, _clock) = (
+    pub fn new(ipfs: Ipfs<Types>, identity: Identity, opts: &LogOptions) -> Log<Types> {
+        let (id, _access, _heads, _clock) = (
             opts.id(),
             opts.access(),
-            opts.entries(),
+            // opts.entries(),
             opts.heads(),
             opts.clock(),
         );
@@ -119,7 +124,7 @@ impl<Types: IpfsTypes> Log<Types> {
 
         // TODO: Let's do this calculation in LogOptions and throw it awy
         // let heads = Log::dedup(&if heads.is_empty() {
-        //     Log::find_heads(&entries)
+        //     Log::your dau jufind_heads(&entries)
         // } else {
         // let mut heads_set = HashSet::<Cid>::new();
         // for head in heads {
@@ -154,8 +159,8 @@ impl<Types: IpfsTypes> Log<Types> {
 
         Log {
             id: id.unwrap(),
-            ipfs: ipfs.clone(),
-            // identity: identity,
+            ipfs: ipfs,
+            // identity: identity,ahve to
             // access: access,
             // entries: HashMap::new(),
             // nexts: HashSet::new(),
@@ -174,7 +179,7 @@ impl<Types: IpfsTypes> Log<Types> {
     // [`LogOptions::new()`]: ./struct.LogOptions.html#method.new
     // [`opts.entries(/* entries */)`]: ./struct.LogOptions.html#method.entries
     // [`opts.heads(/* heads */)`]: ./struct.LogOptions.html#method.heads
-    // pub fn from_multihash (ipfs: Rc<IpfsClient>, identity: Identity, opts: LogOptions, hash: &str) -> Log {
+    // pub fn from_multihash (ipfs: Rc<IpfsClient>, identity: Identity, opts: LogOptins, hash: &str) -> Log {
     // 	let es = Entry::fetch_entries(&ipfs,&[hash.to_owned()]).into_iter().map(|x| Rc::new(x)).collect::<Vec<Rc<Entry>>>();
     // 	Log::new(ipfs,identity,opts.entries(&es).heads(&[]))
     // }
@@ -185,7 +190,7 @@ impl<Types: IpfsTypes> Log<Types> {
     //
     // Returns a reference to this log.
     // pub fn join (&mut self, other: &Log, size: Option<usize>) -> Option<&Log> {
-    // 	if self.id != other.id {
+    // 	if self.id !your dau ju= other.id {
     // 		return None;
     // 	}
     // 	let new_items = other.diff(&self);
@@ -265,12 +270,12 @@ impl<Types: IpfsTypes> Log<Types> {
     // 	diff
     // }
 
-    /// Returns the identifier of the log.
-    pub fn id(&self) -> &str {
-        &self.id
-    }
+    // Returns the identifier of the log.
+    // pub fn id(&self) -> &str {
+    //     &self.id
+    // }
 
-    /// Returns the identity of the owner of the log
+    // Returns the identity of the owner of the log
     // pub fn identity(&self) -> Identity {
     //     self.identity.clone()
     // }
@@ -303,19 +308,19 @@ impl<Types: IpfsTypes> Log<Types> {
     // 	self.identity = identity;
     // }
 
-    /// TODO: Document
-    pub fn values(&self) -> Vec<&Entry> {
-        Vec::<&Entry>::new()
-        // let mut values: Vec<Rc<Entry>> = self
-        //     .entries
-        //     .iter()
-        //     .map(|(_cid, entry)| entry.to_owned())
-        //     .collect();
+    // TODO: Document
+    // pub fn values(&self) -> Vec<&Entry> {
+    //     Vec::<&Entry>::new()
+    //     // let mut values: Vec<Rc<Entry>> = self
+    //     //     .entries
+    //     //     .iter()
+    //     //     .map(|(_cid, entry)| entry.to_owned())
+    //     //     .collect();
 
-        // let mut es = self.traverse(&self.heads(), None, None);
-        // es.reverse();
-        // es
-    }
+    //     // let mut es = self.traverse(&self.heads(), None, None);
+    //     // es.reverse();
+    //     // es
+    // }
 
     /// Returns the heads, or latest entries, of the log
     pub fn heads(&self) -> Vec<Cid> {
@@ -362,112 +367,33 @@ impl<Types: IpfsTypes> Log<Types> {
     // 	s
     // }
 
-    /// Traverse the oplog by nexts / refs
+    /// Traverse the oplog by `refs` links
+    ///
     /// TODO: Utilize multithreading here
+    ///
+    /// ![Traversal diagram](../img/traverse.svg)
     pub async fn traverse(
         &self,
         // Increment the clock
-        heads: Vec<Cid>,
+        root_cids: Vec<Cid>,
         // _amount: Option<usize>,
         // _end_hash: Option<String>,
-    ) -> Vec<Cid> {
-        let mut entries = Vec::new();
+    ) -> Result<Vec<(Cid, Entry)>, anyhow::Error> {
+        let mut entries: Vec<(Cid, Entry)> = Vec::new();
 
-        // Perhaps not naive by not utilizing multithreading
+        // Perhaps naive by not utilizing multithreading
         // but also perhaps getting it for free via tokio executor
-        for head in heads {
-            entries.push(head.clone());
-            let ipld = self.ipfs.get_dag(head.into()).await;
-            println!("{:?}", ipld);
+        for head in root_cids {
+            let ipld = self.ipfs.get_dag(head.clone().into()).await?;
+            let entry = Entry::from(ipld);
+            entries.push((head.clone(), entry.clone()));
+
+            for entry in self.traverse(entry.refs()).await? {
+                entries.push(entry)
+            }
         }
-
-        entries
-        // self.entries.iter().collect()
-        // let mut stack = roots.to_owned();
-        // stack.sort_by(|a, b| (self.sort())(a, b));
-        // stack.reverse();
-
-        // 	let mut traversed = HashSet::<&str>::new();
-        // 	let mut result = Vec::new();
-        // 	let mut count = 0;
-
-        // 	while !stack.is_empty() && (amount.is_none() || count < amount.unwrap()) {
-        // 		let e = stack.remove(0);
-        // 		let hash = e.hash().to_owned();
-        // 		count += 1;
-        // 		for h in e.next() {
-        // 			// if let Some(e) = self.get(h) {
-        // 			// 	if !traversed.contains(e.hash()) {
-        // 			// 		stack.insert(0,e.clone());
-        // 			// 		stack.sort_by(|a,b| (self.sort())(a,b));
-        // 			// 		stack.reverse();
-        // 			// 		traversed.insert(e.hash());
-        // 			// 	}
-        // 			// }
-        // 		}
-        // 		result.push(e);
-
-        // 		// if let Some(ref eh) = end_hash {
-        // 		// 	if eh == &hash {
-        // 		// 		break;
-        // 		// 	}
-        // 		// }
-        // 	}
-
-        // 	result
+        Ok(entries)
     }
-
-    // pub fn json (&self) -> String {
-    // 	let mut hs = self.heads().to_owned();
-    // 	hs.sort_by(|a,b| (self.sort())(a,b));
-    // 	hs.reverse();
-    // 	json!({
-    // 		"id": self.id,
-    // 		"heads": hs.into_iter().map(|x| x.hash().to_owned()).collect::<Vec<_>>(),
-    // 	}).to_string()
-    // }
-
-    // pub fn snapshot (&self) -> String {
-    // 	let hs = self.heads().to_owned();
-    // 	let vs = self.values().to_owned();
-    // 	json!({
-    // 		"id": self.id,
-    // 		//"heads": hs.into_iter().map(|x| serde_json::to_string(&*x).unwrap()).collect::<Vec<_>>(),
-    // 		//"values": vs.into_iter().map(|x| serde_json::to_string(&*x).unwrap()).collect::<Vec<_>>(),
-    // 	}).to_string()
-    // }
-
-    // pub fn buffer (&self) -> Vec<u8> {
-    // 	self.json().into_bytes()
-    // }
-
-    // Fetches all the entries with the hashes in `hashes` and all their parents from the IPFS client `ipfs`.
-    //
-    // Returns a vector of entries.
-    // pub fn fetch_entries (ipfs: &IpfsClient, hashes: &[String]) -> Vec<Entry> {
-    // 	let hashes = Arc::new(Mutex::new(hashes.to_vec()));
-    // 	let mut es = Vec::new();
-    // 	loop {
-    // 		let mut result = Vec::new();
-    // 		while !hashes.lock().unwrap().is_empty() {
-    // 			let h = hashes.lock().unwrap().remove(0);
-    // 			let hashes_clone = hashes.clone();
-    // 			result.push(Entry::from_multihash(ipfs,&h).
-    // 			map(move |x| {
-    // 				for n in &x.next {
-    // 					hashes_clone.lock().unwrap().push(n.to_owned());
-    // 				}
-    // 				x
-    // 			}));
-    // 		}
-    // 		es = es.into_iter().chain(Runtime::new().unwrap().block_on(join_all(result)).
-    // 		unwrap().into_iter()).collect::<Vec<Entry>>();
-    // 		if hashes.lock().unwrap().is_empty() {
-    // 			break;
-    // 		}
-    // 	}
-    // 	es
-    // }
 }
 
 // impl std::fmt::Display for Log {

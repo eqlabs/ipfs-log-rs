@@ -3,6 +3,7 @@
 
 #![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 
+/// Entries are IPLD structures that form a graph by their hashes
 pub mod entry;
 pub mod identity;
 pub mod lamport_clock;
@@ -15,38 +16,53 @@ mod util;
 mod tests {
     use super::identity::Identity;
     use super::identity::Signatures;
-    use super::log::{Log};
+    use super::log::Log;
     use super::log_options::LogOptions;
 
-    fn identity1() -> Identity {
+    /*********************/
+    /* Utility Functions */
+    /*********************/
+
+    // Generates a test identity
+    fn identity(user: &str, acl: &str) -> Identity {
         Identity::new(
-            "userA",
-            "public",
+            user,
+            acl,
             Signatures::new("id_signature", "public_signature"),
         )
     }
 
-    // fn identity2() -> Identity {
-    //     Identity::new(
-    //         "userB",
-    //         "public",
-    //         Signatures::new("id_signature", "public_signature"),
-    //     )
-    // }
+    // Spwans a test in-memory instance of IPFS
+    async fn spawn_ipfs() -> ipfs::Ipfs<ipfs::TestTypes> {
+        let options = ipfs::IpfsOptions::inmemory_with_generated_keys(false);
 
-    // fn identity3() -> Identity {
-    //     Identity::new(
-    //         "userC",
-    //         "public",
-    //         Signatures::new("id_signature", "public_signature"),
-    //     )
-    // }
+        let (ipfs, task) = ipfs::UninitializedIpfs::new(options)
+            .await
+            .start()
+            .await
+            .unwrap();
+        tokio::spawn(task);
+
+        ipfs
+    }
+
+    #[tokio::test]
+    async fn append() {
+        let ipfs = spawn_ipfs().await;
+
+        let identity = identity("A", "public");
+        let options = LogOptions::new().set_id("A");
+        let mut log = Log::new(ipfs, identity, &options);
+
+        let _cid = log.append("one").await;
+        let _traversal = log.traverse(log.heads()).await;
+    }
 
     #[test]
     #[ignore]
     fn find_heads() {
-        // let identity = identity1();
-        // // let e1 = Entry::new(&identity1(), "A", b"entryA", Vec::<String>::new(), None);
+        // let identity = identity();
+        // // let e1 = Entry::new(&identity(), "A", b"entryA", Vec::<String>::new(), None);
         // // let e2 = Entry::new(&identity2(), "B", b"entiiiiiiiiikkio;'ikkookkryB", Vec::<String>::new(), None);
         // // let e3 = Entry::new(&identity3(), "C", b"entryC", Vec::<String>::new(), None);
 
@@ -65,50 +81,52 @@ mod tests {
         // // println!("{:?}", &log.heads()[0].to_string());
     }
 
-    use std::path::PathBuf;
-
     #[tokio::test]
     async fn traverse() {
-       let options = ipfs::IpfsOptions::inmemory_with_generated_keys(false);
+        let ipfs = spawn_ipfs().await;
 
-       let (ipfs, task) = ipfs::UninitializedIpfs::new(options)
-           .await
-           .start()
-           .await
-           .unwrap();
-       tokio::spawn(task);
+        let identity = identity("A", "public");
+        let options = LogOptions::new().set_id("A");
+        let mut log = Log::new(ipfs, identity, &options);
 
-       let identity = identity1();
-       let options = LogOptions::new().set_id("A");
-       let mut log = Log::new(&ipfs, identity, &options);
+        log.append("one").await.unwrap();
+        log.append("two").await.unwrap();
+        log.append("three").await.unwrap();
+        log.append("four").await.unwrap();
+        log.append("five").await.unwrap();
 
-       log.append("one").await.unwrap();
-       log.append("two").await.unwrap();
-       log.append("three").await.unwrap();
-       log.append("four").await.unwrap();
-       log.append("five").await.unwrap();
-
-       let _values = log.traverse(log.heads());
+        let _values = log.traverse(log.heads());
     }
 
-    #[test]
-    #[ignore]
-    fn to_string() {
-        // let _expected = "five\n└─four\n  └─three\n    └─two\n      └─one\n";
-        // let mut log = Log::new(identity1(), &LogOptions::new().set_id("A"));
-        // log.append("one").unwrap();
-        // log.append("two").unwrap();
-        // log.append("three").unwrap();
-        // log.append("four").unwrap();
-        // log.append("five").unwrap();
-        // assert_eq!(log.length(), 5);
+    #[tokio::test]
+    async fn length() {
+        let options = ipfs::IpfsOptions::inmemory_with_generated_keys(false);
+
+        let (ipfs, task) = ipfs::UninitializedIpfs::new(options)
+            .await
+            .start()
+            .await
+            .unwrap();
+        tokio::spawn(task);
+
+        let mut log = Log::new(
+            ipfs,
+            identity("A", "public"),
+            &LogOptions::new().set_id("A"),
+        );
+        log.append("one").await.unwrap();
+        log.append("two").await.unwrap();
+        log.append("three").await.unwrap();
+        log.append("four").await.unwrap();
+        log.append("five").await.unwrap();
+        // assert_eq!(log.length().await, 5);
     }
 
     // //fix comparison after implementing genuine hashing
     // #[test]
     // #[ignore]
     // fn get () {
-    // let mut log = Log::new(identity1(),LogOptions::new().id("AAA"));
+    // let mut log = Log::new(identity(),LogOptions::new().id("AAA"));
     // log.append("one",None);
     // assert_eq!(log.get(log.values()[0].hash()).unwrap().hash(),"QmUMWpQmAqh4Uws3eSWkELeic1eHTnwzZq3p3VGt1D5Cy9");
     // assert_eq!(log.get("zero"),None);
@@ -117,7 +135,7 @@ mod tests {
     // #[test]
     // #[ignore]
     // fn set_identity () {
-    // 	let id1 = identity1();
+    // 	let id1 = identity();
     // 	let mut log = Log::new(id1.clone(),LogOptions::new().id("AAA"));
     // 	log.append("one",None);
     // 	assert_eq!(log.values()[0].clock().id(),id1.pub_key());
@@ -146,7 +164,7 @@ mod tests {
     // 		"id": "AAA",
     // 		"heads": ["QmREuiyqTuJrcWr5BLrT9d9p8dcvdWvwc4JJMHpKcei4Em"],
     // 	}).to_string();
-    // 	let mut log = Log::new(identity1(),LogOptions::new().id("AAA"));
+    // 	let mut log = Log::new(identity(),LogOptions::new().id("AAA"));
     // 	log.append("one",None);
     // 	log.append("two",None);
     // 	log.append("three",None);
@@ -154,16 +172,16 @@ mod tests {
     // 	//...
 
     // 	//extra
-    // 	// let log2 = Log::from_multihash(ipfs.clone(),identity1(),LogOptions::new().id("AAA"),"QmREuiyqTuJrcWr5BLrT9d9p8dcvdWvwc4JJMHpKcei4Em");
+    // 	// let log2 = Log::from_multihash(ipfs.clone(),identity(),LogOptions::new().id("AAA"),"QmREuiyqTuJrcWr5BLrT9d9p8dcvdWvwc4JJMHpKcei4Em");
     // 	// assert_eq!(log.snapshot(),log2.snapshot());
-    // 	// let log3 = Log::from_multihash(identity1(),LogOptions::new().id("AAA"),"QmQyM8vsbzs6ibi6DFRhXVFurR1AaFyJkPnnvQTeNEdbZu");
+    // 	// let log3 = Log::from_multihash(identity(),LogOptions::new().id("AAA"),"QmQyM8vsbzs6ibi6DFRhXVFurR1AaFyJkPnnvQTeNEdbZu");
     // 	// assert_ne!(log.snapshot(),log3.snapshot());
     // }
 
     #[test]
     #[ignore]
     fn values() {
-        // let mut log = Log::new(identity1(), &LogOptions::new());
+        // let mut log = Log::new(identity(), &LogOptions::new());
 
         // // Accepts anything that can be represented as a [u8]
         // log.append(b"hello1").unwrap();

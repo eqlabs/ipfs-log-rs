@@ -1,13 +1,15 @@
 [package]
-name = "ipfs-log-rs"
-version = "0.1.0"
-authors = ["Frans Saukko <frans@equilibrium.co>"]
+name = "ipfs_log"
+version = "0.2.0"
+authors = ["Frans Saukko <frans@equilibrium.co>", "Mark Henderson <mark@equilibrium.co>"]
 edition = "2018"
 
+[build-dependencies]
+fs_extra = "1.1.0"
+
 [dependencies]
-# futures = "0.1.29"
-# tokio = "0.1.22"
-# serde = { version = "1.0", features = ["derive"] }
+futures = "0.3.4"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_cbor = "0.10.1"
 hyper = "0.12"

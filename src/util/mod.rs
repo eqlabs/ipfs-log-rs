@@ -3,25 +3,25 @@
 
 // use multihash::Multihash;
 
-use crate::entry::Entry;
+// use crate::entry::Entry;
 
-/// Returns `true` if the entry at `hash` is the parent of `e1`, otherwise returns `false`.
-pub fn is_parent(e1: &Entry, hash: &String) -> bool {
-    e1.next().iter().any(|x| x == hash)
-}
+// Returns `true` if the entry at `hash` is the parent of `e1`, otherwise returns `false`.
+// pub fn _is_parent(e1: &Entry, hash: &String) -> bool {
+//     e1.next().iter().any(|x| x == hash)
+// }
 
-/// Returns a vector of pointers to all direct and indirect children of `entry` in `entries`.
-pub fn find_children(entry: &Entry, hashes: &[String]) -> Vec<String> {
-    let mut stack = Vec::new();
-    let mut parent = hashes.iter().find(|hash| is_parent(entry, hash));
-    while let Some(p) = parent {
-        stack.push(p.clone());
-        let _prev = p;
-        parent = hashes.iter().find(|hash| is_parent(entry, hash));
-    }
-    // stack.sort_by(|a, b| a.clock().time().cmp(&b.clock().time()));
-    stack
-}
+// Returns a vector of pointers to all direct and indirect children of `entry` in `entries`.
+// pub fn _find_children(entry: &Entry, hashes: &[String]) -> Vec<String> {
+//     let mut stack = Vec::new();
+//     let mut parent = hashes.iter().find(|hash| _is_parent(entry, hash));
+//     while let Some(p) = parent {
+//         stack.push(p.clone());
+//         let _prev = p;
+//         parent = hashes.iter().find(|hash| _is_parent(entry, hash));
+//     }
+//     // stack.sort_by(|a, b| a.clock().time().cmp(&b.clock().time()));
+//     stack
+// }
 
 // pub fn find_heads(entries: &[Rc<Entry>]) -> Vec<Multihash> {
 //     let mut parents = HashMap::<Multihash, ()>::new();
