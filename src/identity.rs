@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use sha2::{Sha256,Digest};
 use secp256k1::{Secp256k1,Message,All,Signature,PublicKey,SecretKey};
-use rand::rngs::OsRng;
+use rand::thread_rng;
 use hex;
 
 /// A struct holding identifier and public key signatures for an identity.
@@ -170,7 +170,7 @@ impl DefaultIdentificator {
 
 impl Identificator for DefaultIdentificator {
 	fn create (&mut self, id: &str) -> Identity {
-		let mut rng = OsRng::new().unwrap();
+		let mut rng = thread_rng();
 
 		let (secret_key,id_hash) = self.secp.generate_keypair(&mut rng);
 		let (sk,ih) = (&secret_key.to_string(),&id_hash.serialize_uncompressed().iter().map(|&x| format!("{:02x}",x)).collect::<String>());
@@ -180,15 +180,11 @@ impl Identificator for DefaultIdentificator {
 		let (mk,pk) = (&middle_key.to_string(),&public_key.serialize_uncompressed().iter().map(|&x| format!("{:02x}",x)).collect::<String>());
 		self.put(ih,Keys::new(mk,pk));
 
-		let mut hasher = Sha256::new();
-		hasher.input(ih.as_bytes());
-		let mut dig = hasher.result();
+		let mut dig = Sha256::digest(ih.as_bytes());
 		let id_sign = self.secp.sign(&Message::from_slice(&dig).unwrap(),&middle_key);
 		let mut pkis = pk.to_owned();
 		pkis.push_str(&id_sign.to_string());
-		let mut hasher = Sha256::new();
-		hasher.input(pkis.as_bytes());
-		dig = hasher.result();
+		dig = Sha256::digest(pkis.as_bytes());
 		let pub_sign = self.secp.sign(&Message::from_slice(&dig).unwrap(),&secret_key);
 
 		Identity::new(ih,pk,Signatures::new(&id_sign.to_string(),&pub_sign.to_string()))
@@ -199,9 +195,7 @@ impl Identificator for DefaultIdentificator {
 	}
 
 	fn verify (&self, msg: &str, sig: &str, pk: &str) -> bool {
-		let mut hasher = Sha256::new();
-		hasher.input(msg.as_bytes());
-		let dig = hasher.result();
+		let dig = Sha256::digest(msg.as_bytes());
 		match self.secp.verify(&Message::from_slice(&dig).unwrap(),
 		&Signature::from_str(sig).unwrap(),
 		&PublicKey::from_slice(&hex::decode(pk).unwrap()).unwrap()) {
@@ -211,9 +205,7 @@ impl Identificator for DefaultIdentificator {
 	}
 
 	fn sign (&self, msg: &str, keys: &Keys) -> String {
-		let mut hasher = Sha256::new();
-		hasher.input(msg.as_bytes());
-		let dig = hasher.result();
+		let dig = Sha256::digest(msg.as_bytes());
 		self.secp.sign(&Message::from_slice(&dig).unwrap(),
 		&SecretKey::from_slice(&hex::decode(keys.sec_key()).unwrap()).unwrap()).to_string()
 	}

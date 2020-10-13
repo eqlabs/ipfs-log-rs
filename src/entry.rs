@@ -90,7 +90,7 @@ impl Entry {
 	/// Stores `entry` in the IPFS client `ipfs` and returns a future containing its multihash.
 	///
 	/// **N.B.** *At the moment stores the entry as JSON, not CBOR DAG.*
-	pub fn multihash (ipfs: &IpfsClient, entry: &Entry) -> impl Future<Item = String,Error = Error> + Send {
+	pub fn multihash (ipfs: &IpfsClient, entry: &Entry) -> impl Future<Output = Result<String, Error>> {
 		let e = json!({
 			"hash": "null",
 			"id": entry.id,
@@ -105,7 +105,7 @@ impl Entry {
 	/// Returns the future containing the entry stored in the IPFS client `ipfs` with the multihash `hash`.
 	///
 	/// **N.B.** *At the moment converts the entry from JSON, not CBOR DAG.*
-	pub fn from_multihash (ipfs: &IpfsClient, hash: &str) -> impl Future<Item = Entry,Error = Error> + Send {
+	pub fn from_multihash (ipfs: &IpfsClient, hash: &str) -> impl Future<Output = Result<Entry,Error>> + Send {
 		let h = hash.to_owned();
 		ipfs.cat(hash).concat2().map(|x| {
 			let mut e: Entry = serde_json::from_str(std::str::from_utf8(&x).unwrap()).unwrap();
@@ -134,7 +134,7 @@ impl Entry {
 				}));
 			}
 			es = es.into_iter().chain(Runtime::new().unwrap().block_on(join_all(result)).
-			unwrap().into_iter()).collect::<Vec<Entry>>();
+			into_iter()).collect::<Vec<Entry>>();
 			if hashes.lock().unwrap().is_empty() {
 				break;
 			}
